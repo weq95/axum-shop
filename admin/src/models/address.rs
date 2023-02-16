@@ -8,8 +8,6 @@ use validator::Validate;
 use common::error::{ApiError, ApiResult};
 use common::request::address::ReqAddressInfo;
 
-use crate::models::db;
-
 #[derive(Debug, Default, Clone)]
 pub struct UserAddress {
     pub id: i64,
@@ -32,7 +30,7 @@ pub async fn get(id: i64, userid: i64) -> ApiResult<UserAddress> {
     Ok(sqlx::query(r#"SELECT id,user_id,province,city,street,district,address,zip,contact_name,contact_phone,
     last_used_at,created_at,updated_at FROM user_address WHERE id = $1 and user_id = $2"#)
         .bind(id).bind(userid)
-        .fetch_optional(db().await).await?
+        .fetch_optional(common::pgsql::db().await).await?
         .map(|row| {
             UserAddress {
                 id: row.get::<i64, &str>("id"),
@@ -57,7 +55,7 @@ pub async fn list(userid: i64) -> ApiResult<Vec<UserAddress>> {
     Ok(sqlx::query(r#"SELECT id,user_id,province,city,street,district,address,zip,contact_name,contact_phone,
     last_used_at,created_at,updated_at FROM user_address WHERE user_id = $1 order by last_used_at desc"#)
         .bind(userid)
-        .fetch_all(db().await).await?.into_iter().map(|row| {
+        .fetch_all(common::pgsql::db().await).await?.into_iter().map(|row| {
         UserAddress {
             id: row.get::<i64, &str>("id"),
             user_id: row.get::<i64, &str>("user_id"),
@@ -81,7 +79,7 @@ pub async fn create(userid: i64, info: ReqAddressInfo) -> ApiResult<i64> {
     info.validate()?;
 
     let count = sqlx::query(r#"SELECT COUNT("id") AS count  FROM "user_address" WHERE user_id = $1"#)
-        .bind(userid).fetch_one(db().await).await?.get::<i64, &str>("count");
+        .bind(userid).fetch_one(common::pgsql::db().await).await?.get::<i64, &str>("count");
     if count >= 5 {
         return Err(ApiError::Error("收获地址太多啦, 请尝试修改其他收获地址使用".to_string()));
     }
@@ -101,7 +99,7 @@ pub async fn create(userid: i64, info: ReqAddressInfo) -> ApiResult<i64> {
         .bind(Utc::now())
         .bind(Utc::now())
         .bind(Utc::now())
-        .fetch_one(db().await)
+        .fetch_one(common::pgsql::db().await)
         .await?.get::<i64, &str>("id");
 
     Ok(id)
@@ -123,7 +121,7 @@ pub async fn update(id: i64, userid: i64, info: ReqAddressInfo) -> ApiResult<boo
         .bind(&info.contact_phone)
         .bind(Utc::now())
         .bind(id).bind(userid)
-        .execute(db().await)
+        .execute(common::pgsql::db().await)
         .await?.rows_affected();
 
     Ok(rows_num > 0)
@@ -134,7 +132,7 @@ pub async fn delete(id: i64, user_id: i64) -> ApiResult<bool> {
     let rows_num = sqlx::query("delete from user_address where id = $1 and user_id = $2")
         .bind(id)
         .bind(user_id)
-        .execute(db().await)
+        .execute(common::pgsql::db().await)
         .await?.rows_affected();
 
     Ok(rows_num > 0)
@@ -149,7 +147,7 @@ impl UserAddress {
             .bind(Utc::now())
             .bind(self.id)
             .bind(self.user_id)
-            .execute(db().await)
+            .execute(common::pgsql::db().await)
             .await?.rows_affected();
 
         Ok(rows_num > 0)
@@ -167,7 +165,7 @@ pub struct AddrData {
 pub async fn addr_result(pid: i32) -> ApiResult<Vec<AddrData>> {
     Ok(sqlx::query("select id,name,pid from address where pid = $1 order by id asc")
         .bind(pid)
-        .fetch_all(db().await)
+        .fetch_all(common::pgsql::db().await)
         .await?.into_iter().map(|row| {
         AddrData {
             id: row.get::<i64, &str>("id") as i32,
@@ -191,7 +189,7 @@ pub async fn get_addr_name(ids: HashSet<i32>) -> ApiResult<HashMap<i32, AddrData
 
     let address: Vec<AddrData> = sqlx::query_with(&*("select id,name,pid from address where id in ("
         .to_owned() + placeholder + ")"), arg)
-        .fetch_all(db().await).await?.into_iter().map(|row| {
+        .fetch_all(common::pgsql::db().await).await?.into_iter().map(|row| {
         AddrData {
             id: row.get::<i64, &str>("id") as i32,
             name: row.get::<String, &str>("name"),

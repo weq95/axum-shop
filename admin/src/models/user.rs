@@ -8,8 +8,6 @@ use common::{
 };
 use common::request::user::ReqGetUser;
 
-use crate::models::db;
-
 /// get 用户详情信息
 pub async fn get(info: ReqGetUser) -> ApiResult<GetUser> {
     info.validate()?;
@@ -32,7 +30,7 @@ pub async fn get(info: ReqGetUser) -> ApiResult<GetUser> {
     }
 
     // 注意这里没数据不会报错
-    sql_str.build().fetch_optional(db().await).await?
+    sql_str.build().fetch_optional(common::pgsql::db().await).await?
         .map(|row| {
             Ok(GetUser {
                 id: row.get::<i64, &str>("id") as u64,
@@ -73,10 +71,10 @@ pub async fn list(info: ReqQueryUser) -> ApiResult<ListUser> {
 
     let mut data = ListUser {
         users: Vec::with_capacity(page_size as usize),
-        total: count_str.build().fetch_one(db().await).await?.get::<i64, &str>("total") as u64,
+        total: count_str.build().fetch_one(common::pgsql::db().await).await?.get::<i64, &str>("total") as u64,
     };
 
-    data.users = sql_str.build().fetch_all(db().await).await?.into_iter()
+    data.users = sql_str.build().fetch_all(common::pgsql::db().await).await?.into_iter()
         .map(|row| {
             GetUser {
                 id: row.get::<i64, &str>("id") as u64,
@@ -100,7 +98,7 @@ pub async fn create(info: ReqCrateUser) -> ApiResult<u64> {
     let id: i64 = sqlx::query("insert into users (name, age, nickname, phone, email) values($1, $2, $3, $4, $5) RETURNING id")
         .bind(&info.name).bind(&info.age).bind(&info.nickname)
         .bind(phone).bind(&info.email)
-        .fetch_one(db().await)
+        .fetch_one(common::pgsql::db().await)
         .await?.get::<i64, &str>("id");
 
     Ok(id as u64)
@@ -113,7 +111,7 @@ pub async fn update(info: ReqUpdateUser) -> ApiResult<bool> {
         .bind(&info.name.unwrap())
         .bind(&info.age.unwrap())
         .bind(&info.id.unwrap())
-        .execute(db().await)
+        .execute(common::pgsql::db().await)
         .await?
         .rows_affected();
 
@@ -126,7 +124,7 @@ pub async fn update(info: ReqUpdateUser) -> ApiResult<bool> {
 pub async fn delete(userid: u64) -> ApiResult<bool> {
     let rows_num = sqlx::query("delete from users where id = $1")
         .bind(userid as i64)
-        .execute(db().await)
+        .execute(common::pgsql::db().await)
         .await?
         .rows_affected();
 
