@@ -28,13 +28,13 @@ use controller::{
         user_list,
     },
 };
+use middleware::casbin::CasbinAuthLayer;
 
 // Path  GET    格式: /user/132
 // Query GET    格式: /user/test?id=123&name=456
 mod models;
 mod controller;
 mod middleware;
-
 
 async fn routers() -> Router {
     let login = Router::new()
@@ -56,9 +56,9 @@ async fn routers() -> Router {
         .layer(
             ServiceBuilder::new()
                 .layer(AxumMiddleware::from_fn(middleware::guard))
+                .layer(CasbinAuthLayer)
+                .layer(common::casbin::casbin_layer().await)
         )
-        .layer(common::casbin::casbin_layer())
-        .layer(middleware::casbin::CasbinAuthLayer)
         .merge(login)
 }
 
@@ -77,14 +77,9 @@ async fn main() {
 
     let app_state = Arc::new(AppState {});
 
-    // let router = Router::new().nest("/api", routers().await
-    //     .layer(Extension(app_state)));
-    let router = Router::new()
-        .route("/pen/1", get(test_redis))
-        .route("/pen/2", get(test_redis))
-        .route("/book/:id", get(test_redis))
-        .layer(casbin_middleware)
-        .layer(FakeAuthLayer);
+    let router = Router::new().nest("/api", routers().await
+        .layer(Extension(app_state)));
+
     println!("admin-srv run at: {}", addr);
     axum::Server::bind(&addr)
         .serve(router.into_make_service())

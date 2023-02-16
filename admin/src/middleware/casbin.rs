@@ -1,31 +1,27 @@
 use std::{
     convert::Infallible,
-    ops::{Deref, DerefMut},
-    sync::Arc,
     task::{Context, Poll},
 };
 
 use axum::{
-    body::{self, Body, BoxBody, boxed},
-    http::{Request, StatusCode},
+    body::{Body, BoxBody},
+    http::Request,
     response::Response,
 };
+use axum::body::boxed;
 use axum::response::IntoResponse;
-use casbin::{
-    CachedEnforcer, CoreApi, DefaultModel,
-    FileAdapter, function_map::key_match2, TryIntoAdapter,
-    TryIntoModel,
-};
 use futures::future::BoxFuture;
 use tower::{Layer, Service};
 
+use common::ApiResponse;
 use common::casbin::CasbinVals;
+use common::jwt::Claims;
 
 #[derive(Clone)]
 pub struct CasbinAuthLayer;
 
 #[derive(Clone)]
-struct CabinAuthMiddleware<S> {
+pub struct CabinAuthMiddleware<S> {
     inner: S,
 }
 
@@ -53,10 +49,14 @@ impl<S> Service<Request<Body>> for CabinAuthMiddleware<S>
         let not_ready_inner = self.inner.clone();
         let mut inner = std::mem::replace(&mut self.inner, not_ready_inner);
 
+        let role = match req.extensions().get::<Claims>() {
+            Some(user) => user.clone().role,
+            None => String::from("")
+        };
+
         Box::pin(async move {
-            let _username = String::from("username");
             req.extensions_mut().insert(CasbinVals {
-                subject: _username,
+                subject: role,
                 domain: None,
             });
             inner.call(req).await

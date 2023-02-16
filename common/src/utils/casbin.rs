@@ -36,7 +36,7 @@ pub struct CasbinLayer {
 
 impl CasbinLayer {
     pub async fn new<M: TryIntoModel, A: TryIntoAdapter>(model: M, adapter: A) -> Self {
-        let enforcer: CachedEnforcer = CachedEnforcer::new(model, adapter).await.unwrap();
+        let mut enforcer: CachedEnforcer = CachedEnforcer::new(model, adapter).await.unwrap();
         CasbinLayer {
             enforcer: Arc::new(RwLock::new(enforcer)),
         }
@@ -82,17 +82,6 @@ pub struct CasbinMiddleware<S> {
     enforcer: Arc<RwLock<CachedEnforcer>>,
 }
 
-#[derive(Debug, Deserialize, Serialize, Clone)]
-pub struct CasbinClaims {
-    pub subject: String,
-}
-
-impl CasbinClaims {
-    pub fn new(subject: String) -> Self {
-        Self { subject }
-    }
-}
-
 impl<S> Service<Request<Body>> for CasbinMiddleware<S>
     where S: Service<Request<Body>, Response=Response, Error=Infallible>,
           S: Clone + Send + 'static,
@@ -113,7 +102,7 @@ impl<S> Service<Request<Body>> for CasbinMiddleware<S>
         Box::pin(async move {
             let response: Response<BoxBody> = ApiResponse::<i32>::fail_msg_code(
                 u16::from(StatusCode::FORBIDDEN),
-                "您无权限访问!".to_string(),
+                "您没有操作权限!".to_string(),
             ).response_body().into_response();
 
             let option_vals = req.extensions().get::<CasbinVals>()
@@ -125,13 +114,12 @@ impl<S> Service<Request<Body>> for CasbinMiddleware<S>
             let path = req.uri().clone().to_string();
             let method = req.method().clone().to_string();
             let mut lock = cloned_enforcer.write().await;
-            let username = "admin_name".to_string();
 
             if vals.subject.is_empty() {
                 return Ok(response);
             }
 
-            let subject = vals.subject.clone();
+            let subject = vals.clone().subject;
             if let Some(domain) = vals.domain {
                 match lock.enforce_mut(vec![subject, domain, path, method]) {
                     Ok(bool_val) => {
@@ -183,7 +171,7 @@ g2 = _, _
 e = some(where (p.eft == allow))
 
 [matchers]
-m = g(r.sub, p.sub) && g2(r.obj, p.obj) && regexMatch(r.act, p.act)
+m = g(r.sub, p.sub) && g2(r.obj, p.obj) && regexMatch(r.act, p.act) || r.sub == "admin"
 "#;
 
 
@@ -191,20 +179,10 @@ pub async fn casbin_layer() -> CasbinLayer {
     let model = DefaultModel::from_str(API_DEFAULT_MODEL)
         .await.unwrap();
 
-    let policy = r#"
-p, alice, /pen/1, GET
-p, alice, /pen2/1, GET
-p, book_admin, book_group, GET
-p, pen_admin, pen_group, GET
+    // 以后需要切换成数据库驱动
+    let adapter = FileAdapter::new("config/policy.csv");
 
-g, alice, book_admin
-g, bob, pen_admin
-g2, /book/:id, book_group
-g2, /pen/:id, pen_group
-    "#;
-    let adapter = FileAdapter::new(policy);
-
-    let casbin_val = CasbinLayer::new(model, adapter).await;
+    let mut casbin_val = CasbinLayer::new(model, adapter).await;
     casbin_val.write().await.get_role_manager().write()
         .matching_fn(Some(key_match2), None);
 

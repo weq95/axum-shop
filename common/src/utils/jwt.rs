@@ -18,7 +18,7 @@ const ISS: &str = "湖北大学[University Test]";
 const EXP: i64 = 600;
 
 /// 用户来源
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub enum UserSource {
     //管理端
     Admin,
@@ -33,7 +33,7 @@ pub enum UserSource {
 }
 
 /// 用户类型
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub enum UserType {
     //管理员
     Admin,
@@ -61,21 +61,23 @@ pub struct JWT {
     pub iss: String,
 }
 
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct Claims {
-    id: i64,
+    pub id: i64,
     // 用户类型
-    user_type: UserType,
+    pub user_type: UserType,
     //昵称
-    username: String,
+    pub username: String,
+    //角色
+    pub role: String,
     //账号
-    email: String,
+    pub email: String,
     //来源
-    from: UserSource,
+    pub from: UserSource,
     //租户编码
-    agency_code: String,
+    pub agency_code: String,
     //过期时间
-    exp: i64,
+    pub exp: i64,
     //签发机构
     iss: String,
 }
@@ -102,6 +104,8 @@ impl JWT {
                       source: UserSource,
                       agency_code: String,
                       user_type: UserType) -> Claims {
+        let role = if id == 1 { "admin" } else { "" };
+
         Claims {
             id,
             email,
@@ -111,6 +115,7 @@ impl JWT {
             from: source,
             iss: self.iss.clone(),
             exp: self.calc_claim_exp(),
+            role: role.to_string(),
         }
     }
 
