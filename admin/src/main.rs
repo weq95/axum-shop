@@ -73,7 +73,7 @@ async fn main() {
         .finish()
         .set_default();
 
-    let addr = SocketAddr::from(([127, 0, 0, 1], 80));
+    let addr = SocketAddr::from(([127, 0, 0, 1], 8081));
 
     let app_state = Arc::new(AppState {});
 

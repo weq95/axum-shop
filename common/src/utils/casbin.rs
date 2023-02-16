@@ -182,7 +182,7 @@ pub async fn casbin_layer() -> CasbinLayer {
     // 以后需要切换成数据库驱动
     let adapter = FileAdapter::new("config/policy.csv");
 
-    let mut casbin_val = CasbinLayer::new(model, adapter).await;
+    let casbin_val = CasbinLayer::new(model, adapter).await;
     casbin_val.write().await.get_role_manager().write()
         .matching_fn(Some(key_match2), None);
 
