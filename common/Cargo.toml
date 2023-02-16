@@ -1,0 +1,30 @@
+[package]
+name = "common"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[lib]
+path = "src/lib.rs"
+
+[dependencies]
+tokio = { version = "1.22.0", features = ["full"] }
+axum = { version = "0.6", features = ["multipart", "ws"] }
+serde_json = { version = "1.0" }
+serde = { version = "1.0", features = ["derive"] }
+chrono = { version = "0.4", features = ["unstable-locales"] }
+validator = { version = "0.15", features = ["derive", "phone"] }
+sqlx = { version = "0.6", features = ["runtime-tokio-native-tls", "postgres", "chrono"] }
+md5 = "0.7"
+lazy_static = "1.4"
+jsonwebtoken = "8.2"
+async_once = "0.2"
+#redis = "0.22"
+tower = { version = "0.4", features = ["full"] }
+casbin = { version = "2.0.9", features = ["incremental", "cached"] }
+futures = "0.3.26"
+bytes = "1.4.0"
+http = "0.2.8"
+http-body = "0.4.5"
+rustis = { version = "0.7", features = ["tokio-runtime", "pool", "redis-stack"] }
