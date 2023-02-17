@@ -9,6 +9,7 @@ use std::{
 };
 
 use axum::{
+    async_trait,
     body::{self, Body, BoxBody},
     http::{Request, StatusCode},
     response::{IntoResponse, Response},
