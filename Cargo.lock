@@ -364,6 +364,7 @@ dependencies = [
  "bytes",
  "casbin",
  "chrono",
+ "dotenv",
  "futures",
  "http",
  "http-body",
@@ -632,6 +633,11 @@ dependencies = [
  "redox_users",
  "winapi",
 ]
+
+[[package]]
+name = "dotenv"
+version = "0.15.0"
+source = "git+https://github.com/dotenv-rs/dotenv?rev=8c2ba38#8c2ba38270e6862be47301e02bb09517604f4af9"
 
 [[package]]
 name = "dotenvy"

@@ -29,3 +29,4 @@ bytes = "1.4.0"
 http = "0.2.8"
 http-body = "0.4.5"
 rustis = { version = "0.7", features = ["tokio-runtime", "pool", "redis-stack"] }
+dotenv = { version = "0.15.0", default-features = false, git = "https://github.com/dotenv-rs/dotenv", rev = "8c2ba38" }
