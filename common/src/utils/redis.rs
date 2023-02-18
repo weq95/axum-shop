@@ -11,16 +11,14 @@ use serde::{Deserialize, Serialize};
 
 use crate::error::ApiResult;
 
-const HOST: &str = "127.0.0.1:6379";
-
 lazy_static! {
     static ref REDIS_CLIENT: AsyncOnce<Arc<Pool<RedisManager>>> = AsyncOnce::new(async {
         // redis|rediss://[[<username>]:<password>@]<host>[:<port>][/<database>]
-        let manager = RedisManager::new(HOST).unwrap();
-        let pool = rustis::bb8::Pool::builder().max_size(30).build(manager).await.unwrap();
+        let dns = dotenv::var("REDIS_URL").unwrap();
+        let size: u32 = dotenv::var("REDIS_POOL_SIZE").unwrap().parse().unwrap();
+        let manager = RedisManager::new(dns).unwrap();
+        let pool = rustis::bb8::Pool::builder().max_size(size).build(manager).await.unwrap();
 
-     /* let strr:String =   pool.get().await.unwrap().json_get("school_json:2", JsonGetOptions::default()).await.unwrap();
-        println!("{}", strr);*/
         Arc::new( pool)
     });
 }

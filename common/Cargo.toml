@@ -21,7 +21,6 @@ tokio-postgres = { version = "0.7" }
 lazy_static = "1.4"
 jsonwebtoken = "8.2"
 async_once = "0.2"
-#redis = "0.22"
 tower = { version = "0.4", features = ["full"] }
 casbin = { version = "2.0.9", features = ["incremental", "cached"] }
 futures = "0.3.26"

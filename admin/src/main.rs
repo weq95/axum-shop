@@ -73,6 +73,8 @@ async fn main() {
         .finish()
         .set_default();
 
+    common::init_read_config();
+
     let addr = SocketAddr::from(([127, 0, 0, 1], 8081));
 
     let app_state = Arc::new(AppState {});

@@ -1,4 +1,3 @@
-use std::env;
 use std::sync::Arc;
 
 use async_once::AsyncOnce;
@@ -9,8 +8,9 @@ pub type ConnPool = sqlx::PgPool;
 
 lazy_static! {
     static ref PG_SQL: AsyncOnce<Arc<ConnPool>> = AsyncOnce::new(async{
-         let dns: String = env::var("PG_DNS").unwrap_or("postgres://postgres:123456@localhost:5432".to_string());
-         let conn_pool = PgPoolOptions::new().max_connections(15).connect(&dns).await.unwrap();
+         let dns: String = dotenv::var("DBTABASE_URL").unwrap();
+         let size: u32 = dotenv::var("DBTABASE_POOL_SIZE").unwrap().parse().unwrap();
+         let conn_pool = PgPoolOptions::new().max_connections(size).connect(&dns).await.unwrap();
          Arc::new(conn_pool)
     });
 }

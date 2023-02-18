@@ -563,3 +563,4 @@ impl Adapter for PgSqlAdapter {
         Ok(true)
     }
 }
+
