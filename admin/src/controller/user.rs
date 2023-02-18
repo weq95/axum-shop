@@ -82,7 +82,7 @@ pub async fn login(Json(payload): Json<ReqLogin>) -> impl IntoResponse {
         user.name.clone(),
         UserSource::PC,
         payload.password.unwrap().clone(),
-        UserType::User);
+        UserType::User, "".to_string());
     if let Ok(token) = jwt.token(&claims) {
         return ApiResponse::response(&Ok(json!({"token": token}))).json();
     }

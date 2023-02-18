@@ -7,6 +7,7 @@ use std::{
     },
     task::{Context, Poll},
 };
+use std::path::PathBuf;
 
 use axum::{
     async_trait,
@@ -168,28 +169,8 @@ impl<S> Service<Request<Body>> for CasbinMiddleware<S>
     }
 }
 
-/// default 默认处理规则
-const API_DEFAULT_MODEL: &str = r#"
-[request_definition]
-r = sub, obj, act
-
-[policy_definition]
-p = sub, obj, act
-
-[role_definition]
-g = _, _
-g2 = _, _
-
-[policy_effect]
-e = some(where (p.eft == allow))
-
-[matchers]
-m = g(r.sub, p.sub) && g2(r.obj, p.obj) && regexMatch(r.act, p.act) || r.sub == "admin"
-"#;
-
-
 pub async fn casbin_layer() -> CasbinLayer {
-    let model = DefaultModel::from_str(API_DEFAULT_MODEL)
+    let model = DefaultModel::from_file(PathBuf::from("./config/rbac_domains.conf"))
         .await.unwrap();
 
     let adapter = PgSqlAdapter::new().await.unwrap();

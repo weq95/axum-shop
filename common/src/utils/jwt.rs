@@ -97,25 +97,18 @@ impl JWT {
         Self { secret, exp, iss }
     }
 
-    pub fn new_claims(&self,
-                      id: i64,
-                      email: String,
-                      username: String,
-                      source: UserSource,
-                      agency_code: String,
-                      user_type: UserType) -> Claims {
-        let role = if id == 1 { "admin" } else { "" };
-
+    pub fn new_claims(&self, id: i64, email: String, username: String, source: UserSource,
+                      agency_code: String, user_type: UserType, role: String) -> Claims {
         Claims {
             id,
             email,
             agency_code,
             username,
             user_type,
+            role,
             from: source,
             iss: self.iss.clone(),
             exp: self.calc_claim_exp(),
-            role: role.to_string(),
         }
     }
 
@@ -164,7 +157,8 @@ mod test {
             "weq".to_string(),
             UserSource::PC,
             "AFC".to_string(),
-            UserType::User);
+            UserType::User,
+            "super_admin".to_string());
         let token = jwt.token(&claims).unwrap();
         println!("success. \r\n{:?}", token);
     }
