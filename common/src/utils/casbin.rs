@@ -173,8 +173,7 @@ pub async fn casbin_layer() -> CasbinLayer {
     let model = DefaultModel::from_file(PathBuf::from("./config/rbac_domains.conf"))
         .await.unwrap();
 
-    let adapter = PgSqlAdapter::new().await.unwrap();
-
+    let adapter = crate::pgsql::get_pg_adapter().await;
     let casbin_val = CasbinLayer::new(model, adapter).await;
     casbin_val.write().await.get_role_manager().write()
         .matching_fn(Some(key_match2), None);
@@ -259,13 +258,10 @@ pub struct PgSqlAdapter {
 }
 
 impl PgSqlAdapter {
-    pub async fn new() -> ApiResult<Self> {
-        dotenv().ok();
-
-        let pool = crate::pgsql::db().await;
+    pub(crate) async fn new(pool: &ConnPool) -> Self {
         new(&pool).await.map(|_num| Self {
             is_filtered: Arc::new(AtomicBool::new(false)),
-        })
+        }).unwrap()
     }
 
     pub(crate) fn save_policy_line<'a>(&self, ptype: &'a str, rule: &'a [String]) -> Option<NewCasbinRule<'a>> {
@@ -544,4 +540,5 @@ impl Adapter for PgSqlAdapter {
         Ok(true)
     }
 }
+
 
