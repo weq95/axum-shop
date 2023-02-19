@@ -1,57 +1,38 @@
-use std::collections::HashMap;
-use std::fmt::Debug;
-use std::sync::Arc;
+use std::borrow::BorrowMut;
+use std::ops::DerefMut;
 
 use async_once::AsyncOnce;
 use lazy_static::lazy_static;
-use rustis::bb8::{Pool, PooledConnection as RedisConn};
-use rustis::client::PooledClientManager as RedisManager;
-use rustis::commands::{JsonCommands, JsonGetOptions};
-use serde::{Deserialize, Serialize};
+use r2d2_redis::{r2d2, r2d2::Pool, redis, RedisConnectionManager};
+use r2d2_redis::r2d2::PooledConnection;
+use serde::de::DeserializeOwned;
 
 use crate::error::ApiResult;
 
 lazy_static! {
-    static ref REDIS_CLIENT: AsyncOnce<Arc<Pool<RedisManager>>> = AsyncOnce::new(async {
+   pub static ref REDIS_CLIENT: AsyncOnce<Pool<RedisConnectionManager>> = AsyncOnce::new(async {
         // redis|rediss://[[<username>]:<password>@]<host>[:<port>][/<database>]
         let dns = dotenv::var("REDIS_URL").unwrap();
         let size: u32 = dotenv::var("REDIS_POOL_SIZE").unwrap().parse().unwrap();
-        let manager = RedisManager::new(dns).unwrap();
-        let pool = rustis::bb8::Pool::builder().max_size(size).build(manager).await.unwrap();
 
-        Arc::new( pool)
+       let manager = RedisConnectionManager::new(dns).unwrap();
+       r2d2::Pool::builder().max_size(size).build(manager).unwrap()
     });
 }
 
-pub async fn get(key: String) -> ApiResult<String> {
-    let mut client: RedisConn<RedisManager> = REDIS_CLIENT.get().await.get().await?;
-    let result: String = client.json_get(key, JsonGetOptions::default()).await?;
-
-    Ok(result)
+pub async fn get_conn_manager() -> PooledConnection<RedisConnectionManager> {
+    REDIS_CLIENT.get().await.clone().get().unwrap()
 }
 
-/*async fn comm_t<'a, T: Deserialize<'a>>(key: &'a str, val: T) -> ApiResult<T> {
-    let mut client: RedisConn<RedisManager> = REDIS_CLIENT.get().await.get().await?;
-    let result: String = client.json_get(key, JsonGetOptions::default()).await?;
+pub async fn json_get<T: DeserializeOwned>(conn: &mut redis::Connection, key: &str, field: &str) -> ApiResult<T> {
+    let mut binding = redis::cmd("JSON.GET");
 
-    // result 到后边就被销掉了, 所以这里不知道怎么解决
-    Ok(serde_json::from_str::<val>(result.as_str())?)
-}*/
+    let cmd = binding.arg(key).arg(format!("$.{}", field));
+    let result: Option<String> = {
+        let cmd = cmd.clone();
+        cmd.query(conn.borrow_mut()).unwrap()
+    };
 
-/// 公共转类型方法
-pub async fn comm_to<'a, T: Deserialize<'a>>(result: &'a str) -> ApiResult<T> {
-    Ok(serde_json::from_str::<T>(result)?)
-}
-
-#[derive(Serialize, Deserialize, Default, Debug, Clone)]
-pub struct SchoolJson {
-    pub name: String,
-    pub description: String,
-    pub class: String,
-    #[serde(rename = "type")]
-    pub type_data: Vec<String>,
-    pub address: HashMap<String, String>,
-    pub students: i64,
-    pub location: String,
-    pub status_log: Vec<String>,
+    let value: T = serde_json::from_str(&result.unwrap()).unwrap();
+    Ok(value)
 }

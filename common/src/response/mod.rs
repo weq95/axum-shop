@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::fmt::Debug;
 
 use axum::{
@@ -95,4 +96,17 @@ impl<T: Serialize + DeserializeOwned + Clone + Debug> ApiResponse<T> {
             .body(Body::from(self.to_string()))
             .unwrap()
     }
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct SchoolJson {
+    pub name: String,
+    pub description: String,
+    pub class: String,
+    #[serde(rename = "type")]
+    pub type_data: Vec<String>,
+    pub address: HashMap<String, String>,
+    pub students: i64,
+    pub location: String,
+    pub status_log: Vec<String>,
 }

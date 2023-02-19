@@ -7,8 +7,8 @@ use std::str::Utf8Error;
 use axum::http::StatusCode;
 use axum::response::{IntoResponse, Response};
 use chrono::ParseError;
-use rustis::bb8::RunError;
-use serde::{Deserialize, Deserializer, Serialize};
+use redis::RedisError;
+use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use serde::de::Visitor;
 use validator::{ValidationError, ValidationErrors};
 
@@ -111,21 +111,6 @@ impl From<ParseIntError> for ApiError {
     }
 }
 
-impl From<rustis::Error> for ApiError {
-    fn from(value: rustis::Error) -> Self {
-        ApiError::Error(value.to_string())
-    }
-}
-
-impl From<RunError<rustis::Error>> for ApiError {
-    fn from(errors: RunError<rustis::Error>) -> Self {
-        match errors {
-            RunError::User(e) => ApiError::Error(e.to_string()),
-            RunError::TimedOut => ApiError::Error("链接超时(timeout)".to_string())
-        }
-    }
-}
-
 impl From<serde_json::Error> for ApiError {
     fn from(value: serde_json::Error) -> Self {
         ApiError::Error(value.to_string())
@@ -134,6 +119,18 @@ impl From<serde_json::Error> for ApiError {
 
 impl From<Utf8Error> for ApiError {
     fn from(value: Utf8Error) -> Self {
+        ApiError::Error(value.to_string())
+    }
+}
+
+impl From<RedisError> for ApiError {
+    fn from(value: RedisError) -> Self {
+        ApiError::Error(value.to_string())
+    }
+}
+
+impl From<r2d2_redis::Error> for ApiError {
+    fn from(value: r2d2_redis::Error) -> Self {
         ApiError::Error(value.to_string())
     }
 }

@@ -12,7 +12,6 @@ axum = { version = "0.6.6", features = ["multipart", "ws", "headers"] }
 serde_json = { version = "1.0" }
 serde = { version = "1.0", features = ["derive"] }
 chrono = "0.4"
-#redis = { version = "0.22", features = ["tokio"] }
 jsonwebtoken = "8.2"
 log = "0.4"
 #fast_log = { version = "1.5", features = ["zip", "gzip"] }

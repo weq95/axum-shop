@@ -1,3 +1,4 @@
+use std::ops::DerefMut;
 use std::sync::Arc;
 
 use axum::{
@@ -8,19 +9,19 @@ use axum::{
 use serde_json::json;
 use validator::Validate;
 
-use common::{
-    ApiResponse,
-    jwt::{JWT, UserSource, UserType},
-    request::user::{
-        ReqCrateUser,
-        ReqGetUser,
-        ReqLogin,
-        ReqQueryUser,
-        ReqUpdateUser,
-    },
-    utils::redis,
+use common::{ApiResponse,
+             jwt::{JWT, UserSource, UserType},
+             request::user::{
+                 ReqCrateUser,
+                 ReqGetUser,
+                 ReqLogin,
+                 ReqQueryUser,
+                 ReqUpdateUser,
+             },
+             SchoolJson,
+             utils::redis,
 };
-use common::redis::SchoolJson;
+use common::redis::REDIS_CLIENT;
 
 use crate::AppState;
 use crate::models::user::{
@@ -34,14 +35,12 @@ use crate::models::user::{
 /// 用户注册
 pub async fn register(Json(_payload): Json<ReqGetUser>) {}
 
-pub async fn test_redis(Json(_payload): Json<serde_json::Value>) -> impl IntoResponse {
-    let key: String = "school_json:1".to_string();
-    match redis::get(key).await {
-        Err(_e) => ApiResponse::fail_msg(_e.to_string()).json(),
-        Ok(data) => {
-            ApiResponse::response(&redis::comm_to::<SchoolJson>(&data).await).json()
-        }
-    }
+pub async fn test_redis(Json(payload): Json<serde_json::Value>) -> impl IntoResponse {
+    let key = payload.get("key").unwrap().as_str().unwrap();
+
+    let mut conn = redis::get_conn_manager().await;
+    let data = redis::json_get::<SchoolJson>(conn.deref_mut(), key, "*").await;
+    ApiResponse::response(&Ok(data)).json()
 }
 
 /// 用户登录
