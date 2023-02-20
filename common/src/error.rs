@@ -135,6 +135,12 @@ impl From<r2d2_redis::Error> for ApiError {
     }
 }
 
+impl From<r2d2_redis::redis::RedisError> for ApiError {
+    fn from(value: r2d2_redis::redis::RedisError) -> Self {
+        ApiError::Error(value.to_string())
+    }
+}
+
 
 impl From<Infallible> for ApiError {
     fn from(value: Infallible) -> Self {

@@ -7,7 +7,7 @@ use r2d2_redis::{r2d2, r2d2::Pool, redis, RedisConnectionManager};
 use r2d2_redis::r2d2::PooledConnection;
 use serde::de::DeserializeOwned;
 
-use crate::error::ApiResult;
+use crate::error::{ApiError, ApiResult};
 
 lazy_static! {
    pub static ref REDIS_CLIENT: AsyncOnce<Pool<RedisConnectionManager>> = AsyncOnce::new(async {
@@ -30,9 +30,13 @@ pub async fn json_get<T: DeserializeOwned>(conn: &mut redis::Connection, key: &s
     let cmd = binding.arg(key).arg(format!("$.{}", field));
     let result: Option<String> = {
         let cmd = cmd.clone();
-        cmd.query(conn.borrow_mut()).unwrap()
+        cmd.query(conn.borrow_mut())?
     };
 
-    let value: T = serde_json::from_str(&result.unwrap()).unwrap();
-    Ok(value)
+    if let Some(data) = result {
+        let value: T = serde_json::from_str(&data)?;
+        return Ok(value);
+    }
+
+    Err(ApiError::Error("ket not found".to_string()))
 }
