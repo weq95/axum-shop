@@ -40,7 +40,7 @@ pub async fn test_redis(Json(payload): Json<serde_json::Value>) -> impl IntoResp
 
     let mut conn = redis::get_conn_manager().await;
     let data = redis::json_get::<SchoolJson>(conn.deref_mut(), key, "*").await;
-    ApiResponse::response(&Ok(data)).json()
+    ApiResponse::response(Some(data)).json()
 }
 
 /// 用户登录
@@ -82,7 +82,7 @@ pub async fn login(Json(payload): Json<ReqLogin>) -> impl IntoResponse {
         payload.password.unwrap().clone(),
         UserType::User, "".to_string());
     if let Ok(token) = jwt.token(&claims) {
-        return ApiResponse::response(&Ok(json!({"token": token}))).json();
+        return ApiResponse::response(Some(json!({"token": token}))).json();
     }
 
     ApiResponse::fail_msg("登录失败,请稍后重试".to_string()).json()
@@ -90,7 +90,7 @@ pub async fn login(Json(payload): Json<ReqLogin>) -> impl IntoResponse {
 
 /// 创建用户
 pub async fn create_admin(Extension(_state): Extension<Arc<AppState>>, Json(user): Json<ReqCrateUser>) -> impl IntoResponse {
-    ApiResponse::response(&ModelCreate(user).await).json()
+    ApiResponse::response(Some(ModelCreate(user).await)).json()
 }
 
 /// 用户详情
@@ -110,12 +110,12 @@ pub async fn get_admin(Extension(_state): Extension<Arc<AppState>>, Path(userid)
     if userinfo.clone().unwrap().id == 0 {
         return ApiResponse::fail_msg("未找到用户信息".to_string()).json();
     }
-    ApiResponse::response(&userinfo).json()
+    ApiResponse::response(Some(userinfo)).json()
 }
 
 /// 更新用户信息
 pub async fn update_admin(Extension(_state): Extension<Arc<AppState>>, Json(user): Json<ReqUpdateUser>) -> impl IntoResponse {
-    ApiResponse::response(&ModelUpdate(user).await).json()
+    ApiResponse::response(Some(ModelUpdate(user).await)).json()
 }
 
 /// 删除用户
@@ -124,10 +124,10 @@ pub async fn delete_admin(Extension(_state): Extension<Arc<AppState>>, Path(user
         return ApiResponse::fail_msg("参数错误".to_string()).json();
     }
 
-    ApiResponse::response(&ModelDelete(userid).await).json()
+    ApiResponse::response(Some(ModelDelete(userid).await)).json()
 }
 
 /// 用户列表
 pub async fn user_list(Extension(_state): Extension<Arc<AppState>>, Query(parma): Query<ReqQueryUser>) -> impl IntoResponse {
-    ApiResponse::response(&ModelList(parma).await).json()
+    ApiResponse::response(Some(ModelList(parma).await)).json()
 }

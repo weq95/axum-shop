@@ -17,6 +17,20 @@ use crate::controller::{
         list_address,
         update_address,
     },
+    auth::{
+        add_role_permission,
+        add_role_user,
+        create_permission,
+        create_role,
+        delete_permissions,
+        delete_roles,
+        get_permission,
+        get_role,
+        permissions,
+        roles,
+        update_permission,
+        update_role,
+    },
     user::{
         create_admin,
         delete_admin,
@@ -45,16 +59,30 @@ pub async fn routers() -> Router {
         .route("/", get(list_address).post(create_address))
         .route("/result/:pid", get(addr_result))
         .route("/:id", get(get_address).put(update_address).delete(delete_address)));
-
+    let role_perm = Router::new().nest("/auth", Router::new()
+        .nest("/roles", Router::new()
+            .route("/", get(roles).post(create_role))
+            .route("/role_user", post(add_role_user))
+            .route("/role_permission", post(add_role_permission))
+            .route("/:id", get(get_role).post(update_role).delete(delete_roles)))
+        .nest("/permissions", Router::new()
+            .route("/", get(permissions).post(create_permission))
+            .route("/:id", get(get_permission).post(update_permission).delete(delete_permissions))),
+    );
 
     Router::new()
-        .merge(users)
-        .merge(address)
-        .layer(
-            ServiceBuilder::new()
-                .layer(AxumMiddleware::from_fn(middleware::guard))
-                .layer(CasbinAuthLayer)
-                .layer(common::casbin::casbin_layer().await)
+        .nest("/api/",
+              Router::new()
+                  .merge(users)
+                  .merge(address)
+                  .layer(
+                      ServiceBuilder::new()
+                          .layer(AxumMiddleware::from_fn(middleware::guard))
+                          .layer(CasbinAuthLayer)
+                          .layer(common::casbin::casbin_layer().await)
+                  )
+
+                  .merge(role_perm)
+                  .merge(login),
         )
-        .merge(login)
 }

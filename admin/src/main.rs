@@ -28,8 +28,7 @@ async fn main() {
 
     let app_state = Arc::new(AppState {});
 
-    let router = Router::new().nest("/api", router::routers().await
-        .layer(Extension(app_state)));
+    let router = router::routers().await.layer(Extension(app_state));
 
     println!("admin-srv run at: {}", addr);
     axum::Server::bind(&addr)

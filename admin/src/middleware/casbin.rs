@@ -10,6 +10,7 @@ use axum::{
 };
 use futures::future::BoxFuture;
 use tower::{Layer, Service};
+
 use common::casbin::CasbinVals;
 use common::jwt::Claims;
 
@@ -45,15 +46,18 @@ impl<S> Service<Request<Body>> for CabinAuthMiddleware<S>
         let not_ready_inner = self.inner.clone();
         let mut inner = std::mem::replace(&mut self.inner, not_ready_inner);
 
-        let role = match req.extensions().get::<Claims>() {
-            Some(user) => user.clone().role,
+        let subject = match req.extensions().get::<Claims>() {
+            Some(user) => {
+                let uid = user.id.to_string();
+                "user:".to_owned() + uid.as_str()
+            }
             None => String::from("")
         };
 
         Box::pin(async move {
             req.extensions_mut().insert(CasbinVals {
-                subject: role,
-                domain: None,
+                subject: subject,
+                domain: Some("localhost".to_string()),
             });
             inner.call(req).await
         })

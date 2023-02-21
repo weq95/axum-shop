@@ -22,7 +22,7 @@ pub async fn get_address(Extension(_state): Extension<Arc<AppState>>, Path(id): 
     let address = ModelAddrName(HashSet::from(
         [info.province, info.city, info.district, info.street])).await.unwrap();
 
-    ApiResponse::response(&Ok(ResAddress {
+    ApiResponse::response(Some(ResAddress {
         id: info.id,
         user_id: info.user_id,
         province: address.get(&info.province).map(|val| val.name.clone()).take(),
@@ -69,25 +69,25 @@ pub async fn list_address(Extension(_state): Extension<Arc<AppState>>) -> impl I
         })
     }
 
-    ApiResponse::response(&Ok(result)).json()
+    ApiResponse::response(Some(result)).json()
 }
 
 /// 用户创建收获地址
 pub async fn create_address(Extension(_state): Extension<Arc<AppState>>, Json(info): Json<ReqAddressInfo>) -> impl IntoResponse {
     let userid = 1i64;
-    ApiResponse::response(&ModelCreate(userid, info).await).json()
+    ApiResponse::response(Some(ModelCreate(userid, info).await)).json()
 }
 
 /// 用户更新收获地址
 pub async fn update_address(Extension(_state): Extension<Arc<AppState>>, Path(id): Path<i64>, Json(info): Json<ReqAddressInfo>) -> impl IntoResponse {
     let userid = 1i64;
-    ApiResponse::response(&ModelUpdate( id, userid, info).await).json()
+    ApiResponse::response(Some(ModelUpdate( id, userid, info).await)).json()
 }
 
 /// 用户删除收获地址
 pub async fn delete_address(Extension(_state): Extension<Arc<AppState>>, Path(id): Path<i64>) -> impl IntoResponse {
     let userid = 1i64;
-    ApiResponse::response(&ModelDelete(id, userid).await).json()
+    ApiResponse::response(Some(ModelDelete(id, userid).await)).json()
 }
 
 /// 获取收获地址资源
@@ -100,5 +100,5 @@ pub async fn addr_result(Extension(_state): Extension<Arc<AppState>>, Path(pid):
             name: item.name,
         })
     }
-    ApiResponse::response(&Ok(data)).json()
+    ApiResponse::response(Some(data)).json()
 }

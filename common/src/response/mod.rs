@@ -6,7 +6,7 @@ use axum::{
     response::Response,
 };
 use axum::response::IntoResponse;
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Serialize, Serializer};
 use serde::de::DeserializeOwned;
 
 use crate::error::ApiError;
@@ -19,15 +19,14 @@ const SUCCESS: u16 = 0;
 /// 全局通用错误编码
 const FAIL: u16 = 10000;
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct ApiResponse<T> {
+#[derive(Debug, Serialize)]
+pub struct ApiResponse<T: Serialize> {
     pub code: u16,
     pub message: String,
     pub data: Option<T>,
 }
 
-impl<T> ToString for ApiResponse<T>
-    where T: Clone + Serialize + DeserializeOwned + Debug {
+impl<T: Serialize> ToString for ApiResponse<T> {
     fn to_string(&self) -> String {
         serde_json::to_string(self)
             .map_err(|err| {
@@ -37,48 +36,43 @@ impl<T> ToString for ApiResponse<T>
     }
 }
 
-impl<T: Serialize + DeserializeOwned + Clone + Debug> ApiResponse<T> {
-    pub fn response(result: &Result<T, ApiError>) -> Self {
-        if false == result.is_ok() {
-            return Self::fail_msg(result.clone().unwrap_err().to_string());
-        }
-
-
+impl<T: Serialize> ApiResponse<T> {
+    pub fn response(result: Option<T>) -> Self {
         Self {
             code: SUCCESS,
             message: "success".to_string(),
-            data: result.clone().ok(),
+            data: result,
         }
     }
 
     pub fn success_code(code: u16) -> Self {
         Self {
-            code: code,
+            code,
             message: "success".to_string(),
             data: None,
         }
     }
 
-    pub fn success_code_data(code: u16, data: &Result<T, ApiError>) -> Self {
+    pub fn success_code_data(code: u16, data: Option<T>) -> Self {
         Self {
-            code: code,
+            code,
             message: "success".to_string(),
-            data: data.clone().ok(),
+            data,
         }
     }
 
     pub fn fail_msg(message: String) -> Self {
         Self {
             code: FAIL,
-            message: message,
+            message,
             data: None,
         }
     }
 
     pub fn fail_msg_code(code: u16, message: String) -> Self {
         Self {
-            code: code,
-            message: message,
+            code,
+            message,
             data: None,
         }
     }
