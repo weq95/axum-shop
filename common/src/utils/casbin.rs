@@ -18,7 +18,7 @@ use axum::{
 use casbin::{
     Adapter, CachedEnforcer, CoreApi,
     DefaultModel, error::AdapterError,
-    Filter, function_map::key_match2, Model,
+    Filter, function_map::{key_match2, regex_match}, Model,
     TryIntoAdapter, TryIntoModel,
 };
 use dotenv::dotenv;
@@ -114,38 +114,40 @@ impl<S> Service<Request<Body>> for CasbinMiddleware<S>
 
         let mut ready_inner = std::mem::replace(&mut self.inner, not_ready_inner);
         Box::pin(async move {
-            let response: Response<BoxBody> = ApiResponse::<i32>::fail_msg_code(
-                u16::from(StatusCode::FORBIDDEN),
-                "您没有操作权限!".to_string(),
-            ).response_body().into_response();
-
+            let response_fn = |code: StatusCode, msg: String| -> Response<BoxBody> {
+                ApiResponse::<i32>::fail_msg_code(u16::from(code), msg)
+                    .response_body().into_response()
+            };
             let option_vals = req.extensions().get::<CasbinVals>()
                 .map(|x| x.to_owned());
             let vals = match option_vals {
                 Some(val) => val,
-                None => return Ok(response),
+                None => return Ok(response_fn(StatusCode::UNAUTHORIZED, "验证用户不存在".to_string())),
             };
-            let path = req.uri().clone().to_string();
+
+            let path = req.uri().path().to_string();
             let method = req.method().clone().to_string();
             let mut lock = cloned_enforcer.write().await;
-
             if vals.subject.is_empty() {
-                return Ok(response);
+                return Ok(response_fn(StatusCode::FORBIDDEN, "验证对象不能为空".to_string()));
             }
 
             let subject = vals.clone().subject;
             if let Some(domain) = vals.domain {
+                println!("{} - {} - {} - {}", subject.clone(), domain.clone(), path.clone(), method.clone());
                 return match lock.enforce_mut(vec![subject, domain, path, method]) {
                     Ok(bool_val) => {
                         drop(lock);
-                        if false == bool_val { return Ok(response); }
+                        if false == bool_val {
+                            return Ok(response_fn(StatusCode::FORBIDDEN, "您没有操作权限".to_string()));
+                        }
 
                         let response: Response<BoxBody> = ready_inner.call(req).await?.map(body::boxed);
                         Ok(response)
                     }
-                    Err(_) => {
+                    Err(_e) => {
                         drop(lock);
-                        Ok(response)
+                        Ok(response_fn(StatusCode::BAD_GATEWAY, _e.to_string()))
                     }
                 };
             }
@@ -154,15 +156,15 @@ impl<S> Service<Request<Body>> for CasbinMiddleware<S>
                 Ok(bool_val) => {
                     drop(lock);
                     if false == bool_val {
-                        return Ok(response);
+                        return Ok(response_fn(StatusCode::FORBIDDEN, "您没有操作权限".to_string()));
                     }
 
                     let response: Response<BoxBody> = ready_inner.call(req).await?.map(body::boxed);
                     Ok(response)
                 }
-                Err(_) => {
+                Err(_e) => {
                     drop(lock);
-                    Ok(response)
+                    Ok(response_fn(StatusCode::BAD_GATEWAY, _e.to_string()))
                 }
             }
         })
@@ -175,8 +177,14 @@ pub async fn casbin_layer() -> CasbinLayer {
 
     let adapter = crate::pgsql::get_pg_adapter().await;
     let casbin_val = CasbinLayer::new(model, adapter).await;
-    casbin_val.write().await.get_role_manager().write()
-        .matching_fn(Some(key_match2), None);
+    {
+        casbin_val.write().await.get_role_manager().write()
+            .matching_fn(Some(key_match2), None);
+    }
+    {
+        casbin_val.write().await.get_role_manager().write()
+            .matching_fn(Some(regex_match), None);
+    }
 
     casbin_val
 }

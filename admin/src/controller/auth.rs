@@ -9,14 +9,17 @@ use serde::de::DeserializeOwned;
 use serde_json::Value;
 use validator::Validate;
 
-use common::{ApiResponse, parse_field, auth::{
-    ReqPermission,
-    ReqRole,
-}};
+use common::{
+    ApiResponse,
+    auth::{
+        ReqPermission,
+        ReqRole,
+    },
+    parse_field,
+};
 use common::jwt::Claims;
 
 use crate::models::auth::{
-    add_permission,
     add_roles,
     Permission,
     Role,
@@ -62,26 +65,6 @@ pub async fn roles() -> impl IntoResponse {
 /// 获取权限
 pub async fn get_permission(Path(permission_id): Path<i64>) -> impl IntoResponse { todo!() }
 
-/// 添加权限
-pub async fn create_permission(Json(permission): Json<ReqPermission>) -> impl IntoResponse {
-    match permission.validate() {
-        Ok(_) => {}
-        Err(e) => {
-            return ApiResponse::fail_msg(e.to_string()).json();
-        }
-    }
-
-    ApiResponse::response(Some(add_permission(vec![
-        Permission {
-            id: 0,
-            name: permission.name.unwrap(),
-            object: permission.object.unwrap(),
-            action: permission.action.unwrap(),
-            domain: "".to_string(),
-        }
-    ], Some("localhost".to_string())).await)).json()
-}
-
 /// 更新权限信息
 pub async fn update_permission(Json(permission): Json<ReqPermission>) -> impl IntoResponse { todo!() }
 
@@ -94,7 +77,7 @@ pub async fn permissions() -> impl IntoResponse {
 }
 
 /// 给用户分配角色
-pub async fn add_role_user(Json(payload): Json<Value>) -> impl IntoResponse {
+pub async fn add_user_roles(Json(payload): Json<Value>) -> impl IntoResponse {
     let mut role_ids: Vec<u32> = match parse_field(&payload, "role_ids") {
         Some(val) => val,
         None => {
@@ -113,20 +96,20 @@ pub async fn add_role_user(Json(payload): Json<Value>) -> impl IntoResponse {
 }
 
 /// 给角色分配权限
-pub async fn add_role_permission(Json(payload): Json<Value>) -> impl IntoResponse {
-    let mut permission_ids: Vec<u32> = match parse_field(&payload, "permission_ids") {
+pub async fn add_role_permissions(Json(payload): Json<Value>) -> impl IntoResponse {
+    let mut permissions: Vec<Permission> = match parse_field(&payload, "permissions") {
         Some(val) => val,
         None => {
             return ApiResponse::fail_msg("权限参数错误".to_string()).json();
         }
     };
-    let role_id = match parse_field(&payload, "role_id") {
+    let role: String = match parse_field(&payload, "role") {
         Some(val) => val,
         None => {
             return ApiResponse::fail_msg("角色参数错误".to_string()).json();
         }
     };
 
-    let domain = "localhost".to_string();
-    ApiResponse::response(Some(role_permissions(role_id, permission_ids, domain).await)).json()
+    let domain = Some("localhost".to_string());
+    ApiResponse::response(Some(role_permissions(role, domain, permissions).await)).json()
 }

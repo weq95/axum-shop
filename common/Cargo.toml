@@ -29,5 +29,4 @@ http = "0.2.8"
 http-body = "0.4.5"
 redis = { version = "0.22.3", features = ["tokio-comp", "json", "serde_json", "r2d2"] }
 r2d2_redis = { version = "0.14.0" }
-#rustis = { version = "0.7", features = ["tokio-runtime", "pool", "redis-stack"] }
 dotenv = { version = "0.15.0", default-features = false, git = "https://github.com/dotenv-rs/dotenv", rev = "8c2ba38" }

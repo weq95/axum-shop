@@ -18,9 +18,8 @@ use crate::controller::{
         update_address,
     },
     auth::{
-        add_role_permission,
-        add_role_user,
-        create_permission,
+        add_role_permissions,
+        add_user_roles,
         create_role,
         delete_permissions,
         delete_roles,
@@ -62,16 +61,16 @@ pub async fn routers() -> Router {
     let role_perm = Router::new().nest("/auth", Router::new()
         .nest("/roles", Router::new()
             .route("/", get(roles).post(create_role))
-            .route("/role_user", post(add_role_user))
-            .route("/role_permission", post(add_role_permission))
+            .route("/user_roles", post(add_user_roles))
+            .route("/role_permissions", post(add_role_permissions))
             .route("/:id", get(get_role).post(update_role).delete(delete_roles)))
         .nest("/permissions", Router::new()
-            .route("/", get(permissions).post(create_permission))
+            .route("/", get(permissions))
             .route("/:id", get(get_permission).post(update_permission).delete(delete_permissions))),
     );
 
     Router::new()
-        .nest("/api/",
+        .nest("/api",
               Router::new()
                   .merge(users)
                   .merge(address)

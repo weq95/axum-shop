@@ -48,8 +48,7 @@ impl<S> Service<Request<Body>> for CabinAuthMiddleware<S>
 
         let subject = match req.extensions().get::<Claims>() {
             Some(user) => {
-                let uid = user.id.to_string();
-                "user:".to_owned() + uid.as_str()
+                format!("user:{}", user.id)
             }
             None => String::from("")
         };
