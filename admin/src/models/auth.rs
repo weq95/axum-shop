@@ -1,10 +1,14 @@
 use std::collections::HashSet;
 use std::ops::{Deref, DerefMut};
+use std::process::id;
 
 use casbin::Adapter;
 use casbin::prelude::*;
 use serde::Deserialize;
+use sqlx::{Arguments, Row};
+use sqlx::postgres::PgArguments;
 
+use common::casbin::{CasbinRule, CasbinVals};
 use common::error::{ApiError, ApiResult};
 
 #[derive(Debug, Clone)]
@@ -102,19 +106,18 @@ pub async fn role_permissions(role: String, domain: Option<String>, mut permissi
 
 
 /// 给用户分配角色
-pub async fn roles_user(userid: u64, mut role_ids: Vec<u32>, domain: String) -> ApiResult<bool> {
-    role_ids.retain(|&id| id > 0);
-    if role_ids.len() == 0 { return Err(ApiError::Error("没有需要分配的角色".to_string())); }
+pub async fn user_roles(userid: u64, domain: String, casbin_rule: Vec<CasbinRule>) -> ApiResult<bool> {
+    if casbin_rule.is_empty() { return Err(ApiError::Error("没有需要分配的角色".to_string())); }
 
     let mut counter: u32 = 0;
     let enforcer = common::casbin::casbin_layer().await.get_enforcer().clone();
     let mut enforcer = enforcer.write().await;
-    for role_id in &role_ids {
+    for rule in &casbin_rule {
         let user_id = format!("user:{}", userid);
         let result = enforcer.add_grouping_policy(
             vec![
                 user_id,
-                role_id.to_string(),
+                rule.v0.clone(),
                 domain.clone(),
             ]).await;
         match result {
@@ -125,6 +128,37 @@ pub async fn roles_user(userid: u64, mut role_ids: Vec<u32>, domain: String) -> 
         }
     }
 
-    println!("total: {} 条, success: {} 条", role_ids.len(), counter);
+    println!("total: {} 条, success: {} 条", casbin_rule.len(), counter);
     Ok(true)
+}
+
+/// 使用id获取相应规则
+pub async fn get_casbin_rules(mut role_ids: HashSet<i32>) -> ApiResult<Vec<CasbinRule>> {
+    role_ids.retain(|&id| id > 0);
+    if role_ids.is_empty() { return Err(ApiError::Error("没有需要分配的权限".to_string())); }
+
+    let mut arg = PgArguments::default();
+    let mut placeholder = String::with_capacity(role_ids.len());
+    let mut idx = 0;
+    for role_id in &role_ids {
+        arg.add(role_id);
+        idx += 1;
+        placeholder.push_str(&*("$".to_owned() + idx.to_string().as_str() + ","));
+    }
+
+    let placeholder = placeholder.trim_matches(',');
+    Ok(sqlx::query_with(&*("SELECT id,ptype,v0,v1,v2,v3,v4,v5 FROM \
+    casbin_rule WHERE id IN (".to_owned() + placeholder + ") ORDER BY id ASC"), arg)
+        .fetch_all(common::pgsql::db().await).await?.into_iter().map(|row| {
+        CasbinRule {
+            id: row.get::<i32, &str>("id"),
+            ptype: row.get::<String, &str>("ptype"),
+            v0: row.get::<String, &str>("v0"),
+            v1: row.get::<String, &str>("v1"),
+            v2: row.get::<String, &str>("v2"),
+            v3: row.get::<String, &str>("v3"),
+            v4: row.get::<String, &str>("v4"),
+            v5: row.get::<String, &str>("v5"),
+        }
+    }).collect::<Vec<CasbinRule>>())
 }

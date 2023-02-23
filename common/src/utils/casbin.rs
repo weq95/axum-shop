@@ -134,7 +134,6 @@ impl<S> Service<Request<Body>> for CasbinMiddleware<S>
 
             let subject = vals.clone().subject;
             if let Some(domain) = vals.domain {
-                println!("{} - {} - {} - {}", subject.clone(), domain.clone(), path.clone(), method.clone());
                 return match lock.enforce_mut(vec![subject, domain, path, method]) {
                     Ok(bool_val) => {
                         drop(lock);
@@ -193,7 +192,7 @@ pub async fn casbin_layer() -> CasbinLayer {
 // ===================================== ↓   CasbinAdapter  ↓ ===================================== //
 
 #[derive(Debug, FromRow)]
-pub(crate) struct CasbinRule {
+pub struct CasbinRule {
     pub id: i32,
     pub ptype: String,
     pub v0: String,

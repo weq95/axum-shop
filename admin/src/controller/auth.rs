@@ -1,3 +1,5 @@
+use std::collections::HashSet;
+
 use axum::{
     body::Body,
     extract::Path,
@@ -21,10 +23,11 @@ use common::jwt::Claims;
 
 use crate::models::auth::{
     add_roles,
+    get_casbin_rules,
     Permission,
     Role,
     role_permissions,
-    roles_user,
+    user_roles,
 };
 
 /// 获取角色
@@ -78,7 +81,7 @@ pub async fn permissions() -> impl IntoResponse {
 
 /// 给用户分配角色
 pub async fn add_user_roles(Json(payload): Json<Value>) -> impl IntoResponse {
-    let mut role_ids: Vec<u32> = match parse_field(&payload, "role_ids") {
+    let role_ids: HashSet<i32> = match parse_field(&payload, "role_ids") {
         Some(val) => val,
         None => {
             return ApiResponse::fail_msg("角色参数错误".to_string()).json();
@@ -91,13 +94,21 @@ pub async fn add_user_roles(Json(payload): Json<Value>) -> impl IntoResponse {
         }
     };
 
+    let rules = match get_casbin_rules(role_ids).await {
+        Ok(result) => result,
+        Err(e) => {
+            return ApiResponse::fail_msg(e.to_string()).json();
+        }
+    };
+
+
     let domain = "localhost".to_string();
-    ApiResponse::response(Some(roles_user(user_id, role_ids, domain).await)).json()
+    ApiResponse::response(Some(user_roles(user_id, domain, rules).await)).json()
 }
 
 /// 给角色分配权限
 pub async fn add_role_permissions(Json(payload): Json<Value>) -> impl IntoResponse {
-    let mut permissions: Vec<Permission> = match parse_field(&payload, "permissions") {
+    let permissions: Vec<Permission> = match parse_field(&payload, "permissions") {
         Some(val) => val,
         None => {
             return ApiResponse::fail_msg("权限参数错误".to_string()).json();
