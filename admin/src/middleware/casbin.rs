@@ -31,9 +31,11 @@ impl<S> Layer<S> for CasbinAuthLayer {
 }
 
 impl<S> Service<Request<Body>> for CabinAuthMiddleware<S>
-    where S: Service<Request<Body>, Response=Response, Error=Infallible>,
-          S: Clone + Send + 'static,
-          S::Future: Send + 'static {
+where
+    S: Service<Request<Body>, Response = Response, Error = Infallible>,
+    S: Clone + Send + 'static,
+    S::Future: Send + 'static,
+{
     type Response = Response<BoxBody>;
     type Error = Infallible;
     type Future = BoxFuture<'static, Result<Self::Response, Self::Error>>;
@@ -48,9 +50,13 @@ impl<S> Service<Request<Body>> for CabinAuthMiddleware<S>
 
         let subject = match req.extensions().get::<Claims>() {
             Some(user) => {
-                format!("user:{}", user.id)
+                if user.id == 1 {
+                    "super_admin".to_string()
+                } else {
+                    format!("user:{}", user.id)
+                }
             }
-            None => String::from("")
+            None => String::from(""),
         };
 
         Box::pin(async move {

@@ -1,13 +1,13 @@
+use std::path::PathBuf;
 use std::{
     convert::Infallible,
     ops::{Deref, DerefMut},
     sync::{
-        Arc,
         atomic::{AtomicBool, Ordering},
+        Arc,
     },
     task::{Context, Poll},
 };
-use std::path::PathBuf;
 
 use axum::{
     async_trait,
@@ -16,26 +16,18 @@ use axum::{
     response::{IntoResponse, Response},
 };
 use casbin::{
-    Adapter, CachedEnforcer, CoreApi,
-    DefaultModel, error::AdapterError,
-    Filter, function_map::{key_match2, regex_match}, Model,
-    TryIntoAdapter, TryIntoModel,
+    error::AdapterError,
+    function_map::{key_match2, regex_match},
+    Adapter, CachedEnforcer, CoreApi, DefaultModel, Filter, Model, TryIntoAdapter, TryIntoModel,
 };
-use dotenv::dotenv;
 use futures::future::BoxFuture;
-use sqlx::{
-    Arguments, error::Error as SqlError,
-    FromRow, postgres::PgQueryResult, Row,
-};
+use serde::Serialize;
 use sqlx::postgres::PgArguments;
+use sqlx::{error::Error as SqlError, postgres::PgQueryResult, Arguments, FromRow, Row};
 use tokio::sync::RwLock;
 use tower::{Layer, Service};
 
-use crate::{
-    ApiResponse,
-    error::ApiResult,
-    pgsql::ConnPool,
-};
+use crate::{error::ApiResult, pgsql::ConnPool, ApiResponse};
 
 #[derive(Clone)]
 pub struct CasbinVals {
@@ -97,9 +89,11 @@ pub struct CasbinMiddleware<S> {
 }
 
 impl<S> Service<Request<Body>> for CasbinMiddleware<S>
-    where S: Service<Request<Body>, Response=Response, Error=Infallible>,
-          S: Clone + Send + 'static,
-          S::Future: Send + 'static {
+where
+    S: Service<Request<Body>, Response = Response, Error = Infallible>,
+    S: Clone + Send + 'static,
+    S::Future: Send + 'static,
+{
     type Response = Response<BoxBody>;
     type Error = Infallible;
     type Future = BoxFuture<'static, Result<Self::Response, Self::Error>>;
@@ -116,20 +110,28 @@ impl<S> Service<Request<Body>> for CasbinMiddleware<S>
         Box::pin(async move {
             let response_fn = |code: StatusCode, msg: String| -> Response<BoxBody> {
                 ApiResponse::<i32>::fail_msg_code(u16::from(code), msg)
-                    .response_body().into_response()
+                    .response_body()
+                    .into_response()
             };
-            let option_vals = req.extensions().get::<CasbinVals>()
-                .map(|x| x.to_owned());
+            let option_vals = req.extensions().get::<CasbinVals>().map(|x| x.to_owned());
             let vals = match option_vals {
                 Some(val) => val,
-                None => return Ok(response_fn(StatusCode::UNAUTHORIZED, "验证用户不存在".to_string())),
+                None => {
+                    return Ok(response_fn(
+                        StatusCode::UNAUTHORIZED,
+                        "验证用户不存在".to_string(),
+                    ))
+                }
             };
 
             let path = req.uri().path().to_string();
             let method = req.method().clone().to_string();
             let mut lock = cloned_enforcer.write().await;
             if vals.subject.is_empty() {
-                return Ok(response_fn(StatusCode::FORBIDDEN, "验证对象不能为空".to_string()));
+                return Ok(response_fn(
+                    StatusCode::FORBIDDEN,
+                    "验证对象不能为空".to_string(),
+                ));
             }
 
             let subject = vals.clone().subject;
@@ -138,10 +140,14 @@ impl<S> Service<Request<Body>> for CasbinMiddleware<S>
                     Ok(bool_val) => {
                         drop(lock);
                         if false == bool_val {
-                            return Ok(response_fn(StatusCode::FORBIDDEN, "您没有操作权限".to_string()));
+                            return Ok(response_fn(
+                                StatusCode::FORBIDDEN,
+                                "您没有操作权限".to_string(),
+                            ));
                         }
 
-                        let response: Response<BoxBody> = ready_inner.call(req).await?.map(body::boxed);
+                        let response: Response<BoxBody> =
+                            ready_inner.call(req).await?.map(body::boxed);
                         Ok(response)
                     }
                     Err(_e) => {
@@ -155,7 +161,10 @@ impl<S> Service<Request<Body>> for CasbinMiddleware<S>
                 Ok(bool_val) => {
                     drop(lock);
                     if false == bool_val {
-                        return Ok(response_fn(StatusCode::FORBIDDEN, "您没有操作权限".to_string()));
+                        return Ok(response_fn(
+                            StatusCode::FORBIDDEN,
+                            "您没有操作权限".to_string(),
+                        ));
                     }
 
                     let response: Response<BoxBody> = ready_inner.call(req).await?.map(body::boxed);
@@ -172,16 +181,25 @@ impl<S> Service<Request<Body>> for CasbinMiddleware<S>
 
 pub async fn casbin_layer() -> CasbinLayer {
     let model = DefaultModel::from_file(PathBuf::from("./config/rbac_domains.conf"))
-        .await.unwrap();
+        .await
+        .unwrap();
 
     let adapter = crate::pgsql::get_pg_adapter().await;
     let casbin_val = CasbinLayer::new(model, adapter).await;
     {
-        casbin_val.write().await.get_role_manager().write()
+        casbin_val
+            .write()
+            .await
+            .get_role_manager()
+            .write()
             .matching_fn(Some(key_match2), None);
     }
     {
-        casbin_val.write().await.get_role_manager().write()
+        casbin_val
+            .write()
+            .await
+            .get_role_manager()
+            .write()
             .matching_fn(Some(regex_match), None);
     }
 
@@ -191,7 +209,7 @@ pub async fn casbin_layer() -> CasbinLayer {
 // ===================================== ↑ CasbinMiddleware ↑ ===================================== //
 // ===================================== ↓   CasbinAdapter  ↓ ===================================== //
 
-#[derive(Debug, FromRow)]
+#[derive(Debug, FromRow, Serialize)]
 pub struct CasbinRule {
     pub id: i32,
     pub ptype: String,
@@ -223,7 +241,9 @@ fn normalize_casbin_rule(mut rule: Vec<String>) -> Vec<String> {
 
 /// 数组长度重置 length = 6， 不够补 空 占位符
 fn normalize_casbin_rule_option(rule: Vec<String>) -> Vec<Option<String>> {
-    let mut rule_option = rule.iter().map(|x| Some(x.clone()))
+    let mut rule_option = rule
+        .iter()
+        .map(|x| Some(x.clone()))
         .collect::<Vec<Option<String>>>();
 
     rule_option.resize(6, None);
@@ -231,7 +251,8 @@ fn normalize_casbin_rule_option(rule: Vec<String>) -> Vec<Option<String>> {
 }
 
 pub async fn new(conn: &ConnPool) -> ApiResult<u64> {
-    Ok(sqlx::query(r#" CREATE TABLE IF NOT EXISTS casbin_rule (
+    Ok(sqlx::query(
+        r#" CREATE TABLE IF NOT EXISTS casbin_rule (
                     id SERIAL PRIMARY KEY,
                     ptype VARCHAR NOT NULL,
                     v0 VARCHAR NOT NULL,
@@ -241,7 +262,11 @@ pub async fn new(conn: &ConnPool) -> ApiResult<u64> {
                     v4 VARCHAR NOT NULL,
                     v5 VARCHAR NOT NULL,
                     CONSTRAINT unique_key_sqlx_adapter UNIQUE(ptype, v0, v1, v2, v3, v4, v5));
-    "#).execute(conn).await?.rows_affected())
+    "#,
+    )
+    .execute(conn)
+    .await?
+    .rows_affected())
 }
 
 fn filtered_where_values<'a>(filter: &Filter<'a>) -> ([&'a str; 6], [&'a str; 6]) {
@@ -249,11 +274,15 @@ fn filtered_where_values<'a>(filter: &Filter<'a>) -> ([&'a str; 6], [&'a str; 6]
     let mut p_filter: [&'a str; 6] = ["%", "%", "%", "%", "%", "%"];
 
     for (idx, val) in filter.g.iter().enumerate() {
-        if val != &"" { g_filter[idx] = val; }
+        if val != &"" {
+            g_filter[idx] = val;
+        }
     }
 
     for (idx, val) in filter.p.iter().enumerate() {
-        if val != &"" { p_filter[idx] = val; }
+        if val != &"" {
+            p_filter[idx] = val;
+        }
     }
 
     (g_filter, p_filter)
@@ -266,13 +295,22 @@ pub struct PgSqlAdapter {
 
 impl PgSqlAdapter {
     pub(crate) async fn new(pool: &ConnPool) -> Self {
-        new(&pool).await.map(|_num| Self {
-            is_filtered: Arc::new(AtomicBool::new(false)),
-        }).unwrap()
+        new(&pool)
+            .await
+            .map(|_num| Self {
+                is_filtered: Arc::new(AtomicBool::new(false)),
+            })
+            .unwrap()
     }
 
-    pub(crate) fn save_policy_line<'a>(&self, ptype: &'a str, rule: &'a [String]) -> Option<NewCasbinRule<'a>> {
-        if ptype.trim().is_empty() || rule.is_empty() { return None; }
+    pub(crate) fn save_policy_line<'a>(
+        &self,
+        ptype: &'a str,
+        rule: &'a [String],
+    ) -> Option<NewCasbinRule<'a>> {
+        if ptype.trim().is_empty() || rule.is_empty() {
+            return None;
+        }
         let mut new_rule = NewCasbinRule {
             ptype,
             v0: "",
@@ -284,11 +322,21 @@ impl PgSqlAdapter {
         };
 
         new_rule.v0 = &rule[0];
-        if rule.len() > 1 { new_rule.v1 = &rule[1]; }
-        if rule.len() > 2 { new_rule.v2 = &rule[2]; }
-        if rule.len() > 3 { new_rule.v3 = &rule[3]; }
-        if rule.len() > 4 { new_rule.v4 = &rule[4]; }
-        if rule.len() > 5 { new_rule.v5 = &rule[5]; }
+        if rule.len() > 1 {
+            new_rule.v1 = &rule[1];
+        }
+        if rule.len() > 2 {
+            new_rule.v2 = &rule[2];
+        }
+        if rule.len() > 3 {
+            new_rule.v3 = &rule[3];
+        }
+        if rule.len() > 4 {
+            new_rule.v4 = &rule[4];
+        }
+        if rule.len() > 5 {
+            new_rule.v5 = &rule[5];
+        }
 
         Some(new_rule)
     }
@@ -303,16 +351,25 @@ impl PgSqlAdapter {
 
     fn normalize_policy(&self, casbin_rule: &CasbinRule) -> Option<Vec<String>> {
         let mut result = vec![
-            &casbin_rule.v0, &casbin_rule.v1,
-            &casbin_rule.v2, &casbin_rule.v3,
-            &casbin_rule.v4, &casbin_rule.v5,
+            &casbin_rule.v0,
+            &casbin_rule.v1,
+            &casbin_rule.v2,
+            &casbin_rule.v3,
+            &casbin_rule.v4,
+            &casbin_rule.v5,
         ];
 
         while let Some(last) = result.last() {
-            if last.is_empty() { result.pop(); } else { break; }
+            if last.is_empty() {
+                result.pop();
+            } else {
+                break;
+            }
         }
 
-        if result.is_empty() { return None; }
+        if result.is_empty() {
+            return None;
+        }
 
         Some(result.iter().map(|&x| x.to_owned()).collect())
     }
@@ -322,10 +379,11 @@ impl PgSqlAdapter {
 impl Adapter for PgSqlAdapter {
     async fn load_policy(&self, m: &mut dyn Model) -> casbin::Result<()> {
         let rules = sqlx::query("SELECT * FROM casbin_rule")
-            .fetch_all(crate::pgsql::db().await).await
+            .fetch_all(crate::pgsql::db().await)
+            .await
             .map_err(|err| AdapterError(Box::new(err)))?
-            .into_iter().map(|row| {
-            CasbinRule {
+            .into_iter()
+            .map(|row| CasbinRule {
                 id: row.get::<i32, &str>("id"),
                 ptype: row.get("ptype"),
                 v0: row.get("v0"),
@@ -334,8 +392,8 @@ impl Adapter for PgSqlAdapter {
                 v3: row.get("v3"),
                 v4: row.get("v4"),
                 v5: row.get("v5"),
-            }
-        }).collect::<Vec<CasbinRule>>();
+            })
+            .collect::<Vec<CasbinRule>>();
 
         for casbin_rule in &rules {
             let rule = self.load_policy_line(casbin_rule);
@@ -353,7 +411,11 @@ impl Adapter for PgSqlAdapter {
         Ok(())
     }
 
-    async fn load_filtered_policy<'a>(&mut self, m: &mut dyn Model, f: Filter<'a>) -> casbin::Result<()> {
+    async fn load_filtered_policy<'a>(
+        &mut self,
+        m: &mut dyn Model,
+        f: Filter<'a>,
+    ) -> casbin::Result<()> {
         let (g_filter, p_filter) = filtered_where_values(&f);
 
         let rules = sqlx::query(r#"SELECT * from  casbin_rule WHERE
@@ -400,7 +462,9 @@ impl Adapter for PgSqlAdapter {
         let mut rules = Vec::new();
         if let Some(ast_map) = m.get_model().get("p") {
             for (ptype, ast) in ast_map {
-                let new_rules = ast.get_policy().into_iter()
+                let new_rules = ast
+                    .get_policy()
+                    .into_iter()
                     .filter_map(|x| self.save_policy_line(ptype, x));
 
                 rules.extend(new_rules);
@@ -409,42 +473,71 @@ impl Adapter for PgSqlAdapter {
 
         if let Some(ast_map) = m.get_model().get("g") {
             for (ptype, ast) in ast_map {
-                let new_rules = ast.get_policy().into_iter()
+                let new_rules = ast
+                    .get_policy()
+                    .into_iter()
                     .filter_map(|x| self.save_policy_line(ptype, x));
 
                 rules.extend(new_rules);
             }
         }
 
-        let mut transaction = crate::pgsql::db().await.begin().await
+        let mut transaction = crate::pgsql::db()
+            .await
+            .begin()
+            .await
             .map_err(|err| AdapterError(Box::new(err)))?;
-        sqlx::query("DELETE FROM casbin_rule").execute(&mut transaction).await
+        sqlx::query("DELETE FROM casbin_rule")
+            .execute(&mut transaction)
+            .await
             .map_err(|err| AdapterError(Box::new(err)))?;
 
         for rule in rules {
-            sqlx::query("INSERT INTO casbin_rule ( ptype, v0, v1, v2, v3, v4, v5 )
-                 VALUES ( $1, $2, $3, $4, $5, $6, $7 )")
-                .bind(rule.ptype).bind(rule.v0).bind(rule.v1).bind(rule.v2)
-                .bind(rule.v3).bind(rule.v4).bind(rule.v5)
-                .execute(&mut transaction).await
-                .and_then(|n| {
-                    if PgQueryResult::rows_affected(&n) == 1 {
-                        Ok(true)
-                    } else { Err(SqlError::RowNotFound) }
-                }).map_err(|err| AdapterError(Box::new(err)))?;
+            sqlx::query(
+                "INSERT INTO casbin_rule ( ptype, v0, v1, v2, v3, v4, v5 )
+                 VALUES ( $1, $2, $3, $4, $5, $6, $7 )",
+            )
+            .bind(rule.ptype)
+            .bind(rule.v0)
+            .bind(rule.v1)
+            .bind(rule.v2)
+            .bind(rule.v3)
+            .bind(rule.v4)
+            .bind(rule.v5)
+            .execute(&mut transaction)
+            .await
+            .and_then(|n| {
+                if PgQueryResult::rows_affected(&n) == 1 {
+                    Ok(true)
+                } else {
+                    Err(SqlError::RowNotFound)
+                }
+            })
+            .map_err(|err| AdapterError(Box::new(err)))?;
         }
 
-        transaction.commit().await.map_err(|err| AdapterError(Box::new(err)))?;
+        transaction
+            .commit()
+            .await
+            .map_err(|err| AdapterError(Box::new(err)))?;
 
         Ok(())
     }
 
     async fn clear_policy(&mut self) -> casbin::Result<()> {
-        let mut transaction = crate::pgsql::db().await.begin().await
+        let mut transaction = crate::pgsql::db()
+            .await
+            .begin()
+            .await
             .map_err(|err| AdapterError(Box::new(err)))?;
-        sqlx::query("DELETE FROM casbin_rule").execute(&mut transaction).await
+        sqlx::query("DELETE FROM casbin_rule")
+            .execute(&mut transaction)
+            .await
             .map_err(|err| AdapterError(Box::new(err)))?;
-        transaction.commit().await.map_err(|err| AdapterError(Box::new(err)))?;
+        transaction
+            .commit()
+            .await
+            .map_err(|err| AdapterError(Box::new(err)))?;
 
         Ok(())
     }
@@ -453,65 +546,125 @@ impl Adapter for PgSqlAdapter {
         self.is_filtered.load(Ordering::SeqCst)
     }
 
-    async fn add_policy(&mut self, sec: &str, ptype: &str, rule: Vec<String>) -> casbin::Result<bool> {
+    async fn add_policy(
+        &mut self,
+        sec: &str,
+        ptype: &str,
+        rule: Vec<String>,
+    ) -> casbin::Result<bool> {
         self.add_policies(sec, ptype, Vec::from([rule; 1])).await
     }
 
-    async fn add_policies(&mut self, _sec: &str, ptype: &str, rules: Vec<Vec<String>>) -> casbin::Result<bool> {
-        let new_rules: Vec<NewCasbinRule> = rules.iter()
+    async fn add_policies(
+        &mut self,
+        _sec: &str,
+        ptype: &str,
+        rules: Vec<Vec<String>>,
+    ) -> casbin::Result<bool> {
+        let new_rules: Vec<NewCasbinRule> = rules
+            .iter()
             .filter_map(|x: &Vec<String>| self.save_policy_line(ptype, x))
             .collect::<Vec<NewCasbinRule>>();
 
-        let mut transaction = crate::pgsql::db().await.begin().await
+        let mut transaction = crate::pgsql::db()
+            .await
+            .begin()
+            .await
             .map_err(|err| AdapterError(Box::new(err)))?;
 
         for rule in new_rules {
-            sqlx::query("INSERT INTO casbin_rule ( ptype, v0, v1, v2, v3, v4, v5 )
-                 VALUES ( $1, $2, $3, $4, $5, $6, $7 )")
-                .bind(rule.ptype).bind(rule.v0).bind(rule.v1).bind(rule.v2)
-                .bind(rule.v3).bind(rule.v4).bind(rule.v5)
-                .execute(&mut transaction).await
-                .and_then(|n| {
-                    if PgQueryResult::rows_affected(&n) == 1 {
-                        Ok(true)
-                    } else { Err(SqlError::RowNotFound) }
-                }).map_err(|err| AdapterError(Box::new(err)))?;
+            sqlx::query(
+                "INSERT INTO casbin_rule ( ptype, v0, v1, v2, v3, v4, v5 )
+                 VALUES ( $1, $2, $3, $4, $5, $6, $7 )",
+            )
+            .bind(rule.ptype)
+            .bind(rule.v0)
+            .bind(rule.v1)
+            .bind(rule.v2)
+            .bind(rule.v3)
+            .bind(rule.v4)
+            .bind(rule.v5)
+            .execute(&mut transaction)
+            .await
+            .and_then(|n| {
+                if PgQueryResult::rows_affected(&n) == 1 {
+                    Ok(true)
+                } else {
+                    Err(SqlError::RowNotFound)
+                }
+            })
+            .map_err(|err| AdapterError(Box::new(err)))?;
         }
 
-        transaction.commit().await.map_err(|err| AdapterError(Box::new(err)))?;
+        transaction
+            .commit()
+            .await
+            .map_err(|err| AdapterError(Box::new(err)))?;
         Ok(true)
     }
 
-    async fn remove_policy(&mut self, sec: &str, ptype: &str, rule: Vec<String>) -> casbin::Result<bool> {
+    async fn remove_policy(
+        &mut self,
+        sec: &str,
+        ptype: &str,
+        rule: Vec<String>,
+    ) -> casbin::Result<bool> {
         self.remove_policies(sec, ptype, Vec::from([rule; 1])).await
     }
 
-    async fn remove_policies(&mut self, _sec: &str, ptype: &str, rules: Vec<Vec<String>>) -> casbin::Result<bool> {
-        let mut transaction = crate::pgsql::db().await.begin().await
+    async fn remove_policies(
+        &mut self,
+        _sec: &str,
+        ptype: &str,
+        rules: Vec<Vec<String>>,
+    ) -> casbin::Result<bool> {
+        let mut transaction = crate::pgsql::db()
+            .await
+            .begin()
+            .await
             .map_err(|err| AdapterError(Box::new(err)))?;
 
         for rule in rules {
             let rule = normalize_casbin_rule(rule);
-            sqlx::query(r#" DELETE FROM casbin_rule WHERE
+            sqlx::query(
+                r#" DELETE FROM casbin_rule WHERE
                     ptype = $1 AND v0 = $2 AND v1 = $3 AND
-                    v2 = $4 AND v3 = $5 AND v4 = $6 AND v5 = $7"#)
-                .bind(ptype).bind(&rule[0]).bind(&rule[1])
-                .bind(&rule[2]).bind(&rule[3]).bind(&rule[4])
-                .bind(&rule[5]).execute(&mut transaction).await
-                .and_then(|n| {
-                    if PgQueryResult::rows_affected(&n) == 1 {
-                        Ok(true)
-                    } else { Err(SqlError::RowNotFound) }
-                }).map_err(|err| AdapterError(Box::new(err)))?;
+                    v2 = $4 AND v3 = $5 AND v4 = $6 AND v5 = $7"#,
+            )
+            .bind(ptype)
+            .bind(&rule[0])
+            .bind(&rule[1])
+            .bind(&rule[2])
+            .bind(&rule[3])
+            .bind(&rule[4])
+            .bind(&rule[5])
+            .execute(&mut transaction)
+            .await
+            .and_then(|n| {
+                if PgQueryResult::rows_affected(&n) == 1 {
+                    Ok(true)
+                } else {
+                    Err(SqlError::RowNotFound)
+                }
+            })
+            .map_err(|err| AdapterError(Box::new(err)))?;
         }
 
-        transaction.commit().await.map_err(|err| AdapterError(Box::new(err)))?;
+        transaction
+            .commit()
+            .await
+            .map_err(|err| AdapterError(Box::new(err)))?;
 
         Ok(true)
     }
 
-    async fn remove_filtered_policy(&mut self, _sec: &str, ptype: &str,
-                                    field_index: usize, field_values: Vec<String>) -> casbin::Result<bool> {
+    async fn remove_filtered_policy(
+        &mut self,
+        _sec: &str,
+        ptype: &str,
+        field_index: usize,
+        field_values: Vec<String>,
+    ) -> casbin::Result<bool> {
         if field_index > 5 || field_values.is_empty() || field_values.len() <= field_index {
             return Ok(false);
         }
@@ -523,13 +676,21 @@ impl Adapter for PgSqlAdapter {
         let mut idx = 1;
 
         while counter > 0 {
-            let v_field_n = "v".to_owned() + idx.to_string().as_str();//v1
-            let v_name = "$".to_owned() + (idx + 1).to_string().as_str();//$2
+            let v_field_n = "v".to_owned() + idx.to_string().as_str(); //v1
+            let v_name = "$".to_owned() + (idx + 1).to_string().as_str(); //$2
 
             // (v1 is NULL OR v1 = COALESCE($2,v1)) AND
-            placeholder.push_str(&*(" (".to_owned() + v_field_n.clone().as_str() + " is null or " +
-                v_field_n.clone().as_str() + " coalesce(" + v_name.clone().as_str() + "," + v_field_n.clone().as_str()
-                + ")) and "));
+            placeholder.push_str(
+                &*(" (".to_owned()
+                    + v_field_n.clone().as_str()
+                    + " is null or "
+                    + v_field_n.clone().as_str()
+                    + " coalesce("
+                    + v_name.clone().as_str()
+                    + ","
+                    + v_field_n.clone().as_str()
+                    + ")) and "),
+            );
             arg.add(&field_vals[idx]);
 
             idx += 1;
@@ -541,11 +702,10 @@ impl Adapter for PgSqlAdapter {
         let sql_str = "DELETE FROM casbin_rule WHERE ptype = ".to_owned() + ptype + " and ";
         sqlx::query_with(&*(sql_str.as_str().to_owned() + placeholder), arg)
             .execute(crate::pgsql::db().await)
-            .await.map(|n| PgQueryResult::rows_affected(&n) >= 1)
+            .await
+            .map(|n| PgQueryResult::rows_affected(&n) >= 1)
             .map_err(|err| AdapterError(Box::new(err)))?;
 
         Ok(true)
     }
 }
-
-

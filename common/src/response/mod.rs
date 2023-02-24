@@ -1,18 +1,12 @@
 use std::collections::HashMap;
 use std::fmt::Debug;
 
-use axum::{
-    body::Body,
-    response::Response,
-};
 use axum::response::IntoResponse;
-use serde::{Deserialize, Serialize, Serializer};
-use serde::de::DeserializeOwned;
+use axum::{body::Body, response::Response};
+use serde::{Deserialize, Serialize};
 
-use crate::error::ApiError;
-
-pub mod user;
 pub mod address;
+pub mod user;
 
 /// 全局通用成功编码
 const SUCCESS: u16 = 0;
@@ -83,7 +77,8 @@ impl<T: Serialize> ApiResponse<T> {
     }
 
     pub fn response_body(&self) -> Response<Body> {
-        Response::builder().extension(|| {})
+        Response::builder()
+            .extension(|| {})
             .header("Access-Control-Allow-Origin", "*")
             .header("Content-Type", "text/json; charset=UTF-8")
             .header("Cache-Control", "no-cache")

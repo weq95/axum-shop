@@ -4,15 +4,14 @@ pub use request::*;
 pub use response::*;
 pub use utils::*;
 
+pub mod error;
 pub mod request;
 pub mod response;
-pub mod error;
 pub mod utils;
 
 pub fn add(left: usize, right: usize) -> usize {
     left + right
 }
-
 
 #[derive(Serialize)]
 pub struct Paginate<T: Serialize> {

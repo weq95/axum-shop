@@ -8,8 +8,8 @@ use axum::http::StatusCode;
 use axum::response::{IntoResponse, Response};
 use chrono::ParseError;
 use redis::RedisError;
-use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use serde::de::Visitor;
+use serde::{Deserialize, Deserializer, Serialize};
 use validator::{ValidationError, ValidationErrors};
 
 /// 返回资源类型
@@ -55,11 +55,9 @@ impl From<ValidationErrors> for ApiError {
             // data.insert(*str.to_string(), 1.to_string());
         }
 
-
         ApiError::Error(_errors.to_string())
     }
 }
-
 
 impl From<sqlx::Error> for ApiError {
     fn from(_e: sqlx::Error) -> Self {
@@ -86,15 +84,15 @@ impl From<axum::Error> for ApiError {
 }
 
 impl From<chrono::ParseError> for ApiError {
-    fn from(_e: ParseError) -> Self { ApiError::Error(_e.to_string()) }
+    fn from(_e: ParseError) -> Self {
+        ApiError::Error(_e.to_string())
+    }
 }
 
 impl IntoResponse for ApiError {
     fn into_response(self) -> Response {
         match self {
-            ApiError::Error(err) => {
-                (StatusCode::OK, err.to_string()).into_response()
-            }
+            ApiError::Error(err) => (StatusCode::OK, err.to_string()).into_response(),
         }
     }
 }
@@ -141,14 +139,12 @@ impl From<r2d2_redis::redis::RedisError> for ApiError {
     }
 }
 
-
 impl From<Infallible> for ApiError {
     fn from(value: Infallible) -> Self {
         let err = value.to_string();
         ApiError::Error(("你没有访问权限 ".to_owned() + err.as_str()).to_string())
     }
 }
-
 
 struct ApiVisitor;
 
@@ -159,17 +155,26 @@ impl<'de> Visitor<'de> for ApiVisitor {
         formatter.write_str("a string")
     }
 
-    fn visit_str<E>(self, v: &str) -> Result<Self::Value, E> where E: serde::de::Error {
+    fn visit_str<E>(self, v: &str) -> Result<Self::Value, E>
+    where
+        E: serde::de::Error,
+    {
         Ok(v.to_string())
     }
 
-    fn visit_string<E>(self, v: String) -> Result<Self::Value, E> where E: serde::de::Error {
+    fn visit_string<E>(self, v: String) -> Result<Self::Value, E>
+    where
+        E: serde::de::Error,
+    {
         Ok(v)
     }
 }
 
 impl<'de> Deserialize<'de> for ApiError {
-    fn deserialize<D>(de: D) -> Result<Self, D::Error> where D: Deserializer<'de> {
+    fn deserialize<D>(de: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
         Ok(ApiError::Error(de.deserialize_string(ApiVisitor)?))
     }
 }

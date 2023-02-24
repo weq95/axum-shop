@@ -1,11 +1,6 @@
 use chrono::{Duration, Utc};
 use jsonwebtoken::{
-    decode as jwt_decode,
-    DecodingKey,
-    encode as jwt_encode,
-    EncodingKey,
-    Header,
-    Validation,
+    decode as jwt_decode, encode as jwt_encode, DecodingKey, EncodingKey, Header, Validation,
 };
 use serde::{Deserialize, Serialize};
 
@@ -97,8 +92,16 @@ impl JWT {
         Self { secret, exp, iss }
     }
 
-    pub fn new_claims(&self, id: i64, email: String, username: String, source: UserSource,
-                      agency_code: String, user_type: UserType, role: String) -> Claims {
+    pub fn new_claims(
+        &self,
+        id: i64,
+        email: String,
+        username: String,
+        source: UserSource,
+        agency_code: String,
+        user_type: UserType,
+        role: String,
+    ) -> Claims {
         Claims {
             id,
             email,
@@ -122,9 +125,12 @@ impl JWT {
 
     /// 获取签名token
     pub fn token(&self, claims: &Claims) -> ApiResult<String> {
-        jwt_encode(&Header::default(), claims,
-                   &EncodingKey::from_secret(self.secret_bytes()))
-            .map_err(ApiError::from)
+        jwt_encode(
+            &Header::default(),
+            claims,
+            &EncodingKey::from_secret(self.secret_bytes()),
+        )
+        .map_err(ApiError::from)
     }
 
     /// 刷新token
@@ -139,8 +145,13 @@ impl JWT {
         let mut validate = Validation::new(jsonwebtoken::Algorithm::HS256);
         validate.set_issuer(&[self.iss.clone()]);
 
-        Ok(jwt_decode(token, &DecodingKey::from_secret(self.secret_bytes()),
-                      &validate).map_err(ApiError::from)?.claims)
+        Ok(jwt_decode(
+            token,
+            &DecodingKey::from_secret(self.secret_bytes()),
+            &validate,
+        )
+        .map_err(ApiError::from)?
+        .claims)
     }
 }
 
@@ -158,7 +169,8 @@ mod test {
             UserSource::PC,
             "AFC".to_string(),
             UserType::User,
-            "super_admin".to_string());
+            "super_admin".to_string(),
+        );
         let token = jwt.token(&claims).unwrap();
         println!("success. \r\n{:?}", token);
     }

@@ -1,126 +1,158 @@
 use std::collections::HashSet;
 
-use axum::{
-    body::Body,
-    extract::Path,
-    http::Request,
-    Json,
-    response::IntoResponse,
-};
-use serde::de::DeserializeOwned;
+use axum::{response::IntoResponse, Json};
 use serde_json::Value;
 use validator::Validate;
 
 use common::{
-    ApiResponse,
-    auth::{
-        ReqPermission,
-        ReqRole,
-    },
-    parse_field,
+    auth::{ReqRolePermissions, ReqRoleUser},
+    parse_field, ApiResponse,
 };
-use common::jwt::Claims;
 
 use crate::models::auth::{
-    add_roles,
-    get_casbin_rules,
-    Permission,
-    Role,
-    role_permissions,
-    user_roles,
+    delete_role_permissions, delete_user_permissions, get_casbin_rules, permissions_for_role,
+    permissions_for_user, role_permissions, roles_for_user, user_roles, RolePermissions, RoleUser,
 };
 
-/// 获取角色
-pub async fn get_role(req: Request<Body>) -> impl IntoResponse {
-    let user = req.extensions().get::<Claims>().unwrap();
-    ApiResponse::response(Some(user.id)).json()
-}
-
-/// 添加角色
-pub async fn create_role(Json(role): Json<ReqRole>) -> impl IntoResponse {
-    match role.validate() {
-        Ok(_) => {}
-        Err(e) => {
-            return ApiResponse::fail_msg(e.to_string()).json();
-        }
-    }
-
-    ApiResponse::response(Some(add_roles(vec![
-        Role {
-            id: 0,
-            name: role.name.unwrap(),
-            domain: "".to_string(),
-        }
-    ], Some("localhost".to_string())).await)).json()
-}
-
-/// 更新角色信息
-pub async fn update_role(Json(role): Json<ReqRole>) -> impl IntoResponse { todo!() }
-
-/// 删除多个角色
-pub async fn delete_roles(Json(role_ids): Json<Vec<i64>>) -> impl IntoResponse { todo!() }
-
-/// 角色列表
-pub async fn roles() -> impl IntoResponse {
-    todo!()
-}
-
-/// 获取权限
-pub async fn get_permission(Path(permission_id): Path<i64>) -> impl IntoResponse { todo!() }
-
-/// 更新权限信息
-pub async fn update_permission(Json(permission): Json<ReqPermission>) -> impl IntoResponse { todo!() }
-
-/// 删除多个权限
-pub async fn delete_permissions(Json(permission_ids): Json<Vec<i64>>) -> impl IntoResponse { todo!() }
-
-/// 权限列表
-pub async fn permissions() -> impl IntoResponse {
-    todo!()
-}
-
-/// 给用户分配角色
-pub async fn add_user_roles(Json(payload): Json<Value>) -> impl IntoResponse {
-    let role_ids: HashSet<i32> = match parse_field(&payload, "role_ids") {
-        Some(val) => val,
+/// 获取角色所有得权限
+pub async fn get_permissions_for_role(Json(payload): Json<Value>) -> impl IntoResponse {
+    let role_id = match parse_field::<String>(&payload, "role_name") {
+        Some(id_str) => id_str,
         None => {
             return ApiResponse::fail_msg("角色参数错误".to_string()).json();
         }
     };
-    let user_id = match parse_field::<u64>(&payload, "user_id") {
-        Some(val) => val,
+    let domain = match parse_field::<String>(&payload, "domain") {
+        Some(domain) => domain,
         None => {
-            return ApiResponse::fail_msg("用户参数错误".to_string()).json();
+            return ApiResponse::fail_msg("域名参数错误".to_string()).json();
         }
     };
 
-    let rules = match get_casbin_rules(role_ids).await {
+    match permissions_for_role(role_id, domain).await {
+        Ok(result) => ApiResponse::response(Some(result)).json(),
+        Err(e) => ApiResponse::fail_msg(e.to_string()).json(),
+    }
+}
+
+/// 获取角色所有的角色
+pub async fn get_roles_for_user(Json(payload): Json<Value>) -> impl IntoResponse {
+    let user_id: u64 = match parse_field(&payload, "user_id") {
+        Some(user_id) => user_id,
+        None => return ApiResponse::fail_msg("用户参数错误".to_string()).json(),
+    };
+    let domain: String = match parse_field(&payload, "domain") {
+        Some(domain) => domain,
+        None => return ApiResponse::fail_msg("参数错误".to_string()).json(),
+    };
+
+    match roles_for_user(user_id, domain).await {
+        Ok(result) => ApiResponse::response(Some(result)).json(),
+        Err(e) => ApiResponse::fail_msg(e.to_string()).json(),
+    }
+}
+
+/// 获取用户拥有的全部权限
+pub async fn get_permissions_for_user(Json(payload): Json<Value>) -> impl IntoResponse {
+    let user_id: u64 = match parse_field(&payload, "user_id") {
+        Some(user_id) => user_id,
+        None => return ApiResponse::fail_msg("用户参数错误".to_string()).json(),
+    };
+    let domain: String = match parse_field(&payload, "domain") {
+        Some(domain) => domain,
+        None => return ApiResponse::fail_msg("参数错误".to_string()).json(),
+    };
+    match permissions_for_user(user_id, domain).await {
+        Ok(result) => ApiResponse::response(Some(result)).json(),
+        Err(e) => ApiResponse::fail_msg(e.to_string()).json(),
+    }
+}
+
+/// 给用户分配角色
+pub async fn add_user_roles(Json(payload): Json<ReqRoleUser>) -> impl IntoResponse {
+    match payload.validate() {
+        Err(e) => return ApiResponse::fail_msg(e.to_string()).json(),
+        Ok(_) => {}
+    }
+    let role_names = HashSet::from([payload.name.unwrap()]);
+    let rules = match get_casbin_rules(role_names).await {
         Ok(result) => result,
         Err(e) => {
             return ApiResponse::fail_msg(e.to_string()).json();
         }
     };
 
-
-    let domain = "localhost".to_string();
-    ApiResponse::response(Some(user_roles(user_id, domain, rules).await)).json()
+    ApiResponse::response(Some(
+        user_roles(
+            payload.user_id.unwrap(),
+            payload.domain.unwrap().clone(),
+            rules,
+        )
+        .await,
+    ))
+    .json()
 }
 
 /// 给角色分配权限
-pub async fn add_role_permissions(Json(payload): Json<Value>) -> impl IntoResponse {
-    let permissions: Vec<Permission> = match parse_field(&payload, "permissions") {
-        Some(val) => val,
-        None => {
-            return ApiResponse::fail_msg("权限参数错误".to_string()).json();
+pub async fn add_role_permissions(
+    Json(payload): Json<Vec<ReqRolePermissions>>,
+) -> impl IntoResponse {
+    for data in &payload {
+        match data.validate() {
+            Err(e) => return ApiResponse::fail_msg(e.to_string()).json(),
+            Ok(_) => {}
         }
-    };
-    let role: String = match parse_field(&payload, "role") {
-        Some(val) => val,
-        None => {
-            return ApiResponse::fail_msg("角色参数错误".to_string()).json();
-        }
-    };
+    }
+    let permissions: Vec<RolePermissions> = payload
+        .into_iter()
+        .map(|row| RolePermissions {
+            object: row.object.clone().unwrap(),
+            action: row.action.clone().unwrap(),
+            domain: row.domain.clone().unwrap(),
+            role_name: row.role_name.clone().unwrap(),
+        })
+        .collect::<Vec<RolePermissions>>();
+    if permissions.clone().is_empty() {
+        return ApiResponse::fail_msg("没有需要添加的权限".to_string()).json();
+    }
 
-    let domain = Some("localhost".to_string());
-    ApiResponse::response(Some(role_permissions(role, domain, permissions).await)).json()
+    ApiResponse::response(Some(role_permissions(permissions).await)).json()
+}
+
+/// 删除角色
+pub async fn delete_role_permission(Json(payload): Json<ReqRolePermissions>) -> impl IntoResponse {
+    match &payload.validate() {
+        Err(e) => return ApiResponse::<bool>::fail_msg(e.to_string()).json(),
+        Ok(_) => {}
+    }
+
+    let result: Vec<RolePermissions> = vec![RolePermissions {
+        object: payload.object.clone().unwrap(),
+        action: payload.action.clone().unwrap(),
+        domain: payload.domain.clone().unwrap(),
+        role_name: payload.role_name.clone().unwrap(),
+    }];
+    match delete_role_permissions(result).await {
+        Ok(bool_val) => ApiResponse::response(Some(bool_val)).json(),
+        Err(e) => ApiResponse::fail_msg(e.to_string()).json(),
+    }
+}
+
+/// 删除用户的权限
+pub async fn delete_user_permission(Json(payload): Json<ReqRoleUser>) -> impl IntoResponse {
+    match &payload.validate() {
+        Err(e) => return ApiResponse::<bool>::fail_msg(e.to_string()).json(),
+        Ok(_) => {}
+    }
+
+    let result: Vec<RoleUser> = vec![RoleUser {
+        user_id: payload.user_id.unwrap() as i64,
+        domain: payload.domain.unwrap(),
+        role_name: payload.name.unwrap(),
+    }];
+
+    match delete_user_permissions(result).await {
+        Ok(bool_val) => ApiResponse::response(Some(bool_val)).json(),
+        Err(e) => ApiResponse::fail_msg(e.to_string()).json(),
+    }
 }

@@ -2,18 +2,16 @@
 use std::net::SocketAddr;
 use std::sync::Arc;
 
-use axum::{Extension, Router};
+use axum::Extension;
 use tracing_subscriber::util::SubscriberInitExt;
 
-mod models;
 mod controller;
 mod middleware;
+mod models;
 mod router;
-
 
 #[derive(Clone, Copy)]
 pub struct AppState {}
-
 
 #[tokio::main]
 async fn main() {
@@ -33,7 +31,6 @@ async fn main() {
     println!("admin-srv run at: {}", addr);
     axum::Server::bind(&addr)
         .serve(router.into_make_service())
-        .await.unwrap();
+        .await
+        .unwrap();
 }
-
-

@@ -1,4 +1,4 @@
-use serde::{Deserialize};
+use serde::Deserialize;
 use validator::Validate;
 
 #[derive(Debug, Validate, Deserialize)]

@@ -1,10 +1,9 @@
 use std::borrow::BorrowMut;
-use std::ops::DerefMut;
 
 use async_once::AsyncOnce;
 use lazy_static::lazy_static;
-use r2d2_redis::{r2d2, r2d2::Pool, redis, RedisConnectionManager};
 use r2d2_redis::r2d2::PooledConnection;
+use r2d2_redis::{r2d2, r2d2::Pool, redis, RedisConnectionManager};
 use serde::de::DeserializeOwned;
 
 use crate::error::{ApiError, ApiResult};
@@ -24,7 +23,11 @@ pub async fn get_conn_manager() -> PooledConnection<RedisConnectionManager> {
     REDIS_CLIENT.get().await.clone().get().unwrap()
 }
 
-pub async fn json_get<T: DeserializeOwned>(conn: &mut redis::Connection, key: &str, field: &str) -> ApiResult<T> {
+pub async fn json_get<T: DeserializeOwned>(
+    conn: &mut redis::Connection,
+    key: &str,
+    field: &str,
+) -> ApiResult<T> {
     let mut binding = redis::cmd("JSON.GET");
 
     let cmd = binding.arg(key).arg(format!("$.{}", field));

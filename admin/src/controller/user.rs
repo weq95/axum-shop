@@ -2,35 +2,25 @@ use std::ops::DerefMut;
 use std::sync::Arc;
 
 use axum::{
-    Extension, extract::{Path, Query},
-    Json,
+    extract::{Path, Query},
     response::IntoResponse,
+    Extension, Json,
 };
 use serde_json::json;
 use validator::Validate;
 
-use common::{ApiResponse,
-             jwt::{JWT, UserSource, UserType},
-             request::user::{
-                 ReqCrateUser,
-                 ReqGetUser,
-                 ReqLogin,
-                 ReqQueryUser,
-                 ReqUpdateUser,
-             },
-             SchoolJson,
-             utils::redis,
+use common::{
+    jwt::{UserSource, UserType, JWT},
+    request::user::{ReqCrateUser, ReqGetUser, ReqLogin, ReqQueryUser, ReqUpdateUser},
+    utils::redis,
+    ApiResponse, SchoolJson,
 };
-use common::redis::REDIS_CLIENT;
 
-use crate::AppState;
 use crate::models::user::{
-    create as ModelCreate,
-    delete as ModelDelete,
-    get as ModelGet,
-    list as ModelList,
+    create as ModelCreate, delete as ModelDelete, get as ModelGet, list as ModelList,
     update as ModelUpdate,
 };
+use crate::AppState;
 
 /// 用户注册
 pub async fn register(Json(_payload): Json<ReqGetUser>) {}
@@ -60,7 +50,8 @@ pub async fn login(Json(payload): Json<ReqLogin>) -> impl IntoResponse {
         nickname: None,
         phone: None,
         email: Some(email.clone()),
-    }).await;
+    })
+    .await;
 
     let user = match user {
         Ok(userinfo) => userinfo,
@@ -80,21 +71,29 @@ pub async fn login(Json(payload): Json<ReqLogin>) -> impl IntoResponse {
         user.name.clone(),
         UserSource::PC,
         payload.password.unwrap().clone(),
-        UserType::User, "".to_string());
+        UserType::User,
+        "".to_string(),
+    );
     if let Ok(token) = jwt.token(&claims) {
-        return ApiResponse::response(Some(json!({"token": token}))).json();
+        return ApiResponse::response(Some(json!({ "token": token }))).json();
     }
 
     ApiResponse::fail_msg("登录失败,请稍后重试".to_string()).json()
 }
 
 /// 创建用户
-pub async fn create_admin(Extension(_state): Extension<Arc<AppState>>, Json(user): Json<ReqCrateUser>) -> impl IntoResponse {
+pub async fn create_admin(
+    Extension(_state): Extension<Arc<AppState>>,
+    Json(user): Json<ReqCrateUser>,
+) -> impl IntoResponse {
     ApiResponse::response(Some(ModelCreate(user).await)).json()
 }
 
 /// 用户详情
-pub async fn get_admin(Extension(_state): Extension<Arc<AppState>>, Path(userid): Path<u64>) -> impl IntoResponse {
+pub async fn get_admin(
+    Extension(_state): Extension<Arc<AppState>>,
+    Path(userid): Path<u64>,
+) -> impl IntoResponse {
     if userid == 0 {
         return ApiResponse::fail_msg("参数错误".to_string()).json();
     }
@@ -106,7 +105,8 @@ pub async fn get_admin(Extension(_state): Extension<Arc<AppState>>, Path(userid)
         nickname: None,
         phone: None,
         email: None,
-    }).await;
+    })
+    .await;
     if userinfo.clone().unwrap().id == 0 {
         return ApiResponse::fail_msg("未找到用户信息".to_string()).json();
     }
@@ -114,12 +114,18 @@ pub async fn get_admin(Extension(_state): Extension<Arc<AppState>>, Path(userid)
 }
 
 /// 更新用户信息
-pub async fn update_admin(Extension(_state): Extension<Arc<AppState>>, Json(user): Json<ReqUpdateUser>) -> impl IntoResponse {
+pub async fn update_admin(
+    Extension(_state): Extension<Arc<AppState>>,
+    Json(user): Json<ReqUpdateUser>,
+) -> impl IntoResponse {
     ApiResponse::response(Some(ModelUpdate(user).await)).json()
 }
 
 /// 删除用户
-pub async fn delete_admin(Extension(_state): Extension<Arc<AppState>>, Path(userid): Path<u64>) -> impl IntoResponse {
+pub async fn delete_admin(
+    Extension(_state): Extension<Arc<AppState>>,
+    Path(userid): Path<u64>,
+) -> impl IntoResponse {
     if userid == 0 {
         return ApiResponse::fail_msg("参数错误".to_string()).json();
     }
@@ -128,6 +134,9 @@ pub async fn delete_admin(Extension(_state): Extension<Arc<AppState>>, Path(user
 }
 
 /// 用户列表
-pub async fn user_list(Extension(_state): Extension<Arc<AppState>>, Query(parma): Query<ReqQueryUser>) -> impl IntoResponse {
+pub async fn user_list(
+    Extension(_state): Extension<Arc<AppState>>,
+    Query(parma): Query<ReqQueryUser>,
+) -> impl IntoResponse {
     ApiResponse::response(Some(ModelList(parma).await)).json()
 }

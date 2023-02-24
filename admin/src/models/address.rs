@@ -1,8 +1,8 @@
 use std::collections::{HashMap, HashSet};
 
 use chrono::{DateTime, NaiveDateTime, Utc};
-use sqlx::{Arguments, Row};
 use sqlx::postgres::PgArguments;
+use sqlx::{Arguments, Row};
 use validator::Validate;
 
 use common::error::{ApiError, ApiResult};
@@ -27,27 +27,30 @@ pub struct UserAddress {
 
 /// 用户收获地址详情
 pub async fn get(id: i64, userid: i64) -> ApiResult<UserAddress> {
-    Ok(sqlx::query(r#"SELECT id,user_id,province,city,street,district,address,zip,contact_name,contact_phone,
-    last_used_at,created_at,updated_at FROM user_address WHERE id = $1 and user_id = $2"#)
-        .bind(id).bind(userid)
-        .fetch_optional(common::pgsql::db().await).await?
-        .map(|row| {
-            UserAddress {
-                id: row.get::<i64, &str>("id"),
-                user_id: row.get::<i64, &str>("user_id"),
-                province: row.get::<i32, &str>("province"),
-                city: row.get::<i32, &str>("city"),
-                district: row.get::<i32, &str>("district"),
-                street: row.get::<i32, &str>("street"),
-                address: row.get("address"),
-                zip: row.get::<i32, &str>("zip"),
-                contact_name: row.get("contact_name"),
-                contact_phone: row.get("contact_phone"),
-                last_used_at: row.get::<DateTime<Utc>, &str>("last_used_at").naive_local(),
-                crated_at: row.get::<DateTime<Utc>, &str>("created_at").naive_local(),
-                updated_at: row.get::<DateTime<Utc>, &str>("updated_at").naive_local(),
-            }
-        }).unwrap_or(UserAddress::default()))
+    Ok(sqlx::query(
+        r#"SELECT id,user_id,province,city,street,district,address,zip,contact_name,contact_phone,
+    last_used_at,created_at,updated_at FROM user_address WHERE id = $1 and user_id = $2"#,
+    )
+    .bind(id)
+    .bind(userid)
+    .fetch_optional(common::pgsql::db().await)
+    .await?
+    .map(|row| UserAddress {
+        id: row.get::<i64, &str>("id"),
+        user_id: row.get::<i64, &str>("user_id"),
+        province: row.get::<i32, &str>("province"),
+        city: row.get::<i32, &str>("city"),
+        district: row.get::<i32, &str>("district"),
+        street: row.get::<i32, &str>("street"),
+        address: row.get("address"),
+        zip: row.get::<i32, &str>("zip"),
+        contact_name: row.get("contact_name"),
+        contact_phone: row.get("contact_phone"),
+        last_used_at: row.get::<DateTime<Utc>, &str>("last_used_at").naive_local(),
+        crated_at: row.get::<DateTime<Utc>, &str>("created_at").naive_local(),
+        updated_at: row.get::<DateTime<Utc>, &str>("updated_at").naive_local(),
+    })
+    .unwrap_or(UserAddress::default()))
 }
 
 /// 用户收获地址列表
@@ -78,10 +81,16 @@ pub async fn list(userid: i64) -> ApiResult<Vec<UserAddress>> {
 pub async fn create(userid: i64, info: ReqAddressInfo) -> ApiResult<i64> {
     info.validate()?;
 
-    let count = sqlx::query(r#"SELECT COUNT("id") AS count  FROM "user_address" WHERE user_id = $1"#)
-        .bind(userid).fetch_one(common::pgsql::db().await).await?.get::<i64, &str>("count");
+    let count =
+        sqlx::query(r#"SELECT COUNT("id") AS count  FROM "user_address" WHERE user_id = $1"#)
+            .bind(userid)
+            .fetch_one(common::pgsql::db().await)
+            .await?
+            .get::<i64, &str>("count");
     if count >= 5 {
-        return Err(ApiError::Error("收获地址太多啦, 请尝试修改其他收获地址使用".to_string()));
+        return Err(ApiError::Error(
+            "收获地址太多啦, 请尝试修改其他收获地址使用".to_string(),
+        ));
     }
 
     let phone = &info.contact_phone.unwrap()[3..].to_string();
@@ -133,7 +142,8 @@ pub async fn delete(id: i64, user_id: i64) -> ApiResult<bool> {
         .bind(id)
         .bind(user_id)
         .execute(common::pgsql::db().await)
-        .await?.rows_affected();
+        .await?
+        .rows_affected();
 
     Ok(rows_num > 0)
 }
@@ -141,14 +151,17 @@ pub async fn delete(id: i64, user_id: i64) -> ApiResult<bool> {
 impl UserAddress {
     /// 更新收获地址最后一次使用信息
     pub async fn update_last_used_at(&self) -> ApiResult<bool> {
-        let rows_num = sqlx::query("update user_address set last_used_at = $1, \
-        updated_at = $2 where id = $3 and user_id = $4")
-            .bind(Utc::now())
-            .bind(Utc::now())
-            .bind(self.id)
-            .bind(self.user_id)
-            .execute(common::pgsql::db().await)
-            .await?.rows_affected();
+        let rows_num = sqlx::query(
+            "update user_address set last_used_at = $1, \
+        updated_at = $2 where id = $3 and user_id = $4",
+        )
+        .bind(Utc::now())
+        .bind(Utc::now())
+        .bind(self.id)
+        .bind(self.user_id)
+        .execute(common::pgsql::db().await)
+        .await?
+        .rows_affected();
 
         Ok(rows_num > 0)
     }
@@ -163,16 +176,19 @@ pub struct AddrData {
 
 /// 获取收获地址
 pub async fn addr_result(pid: i32) -> ApiResult<Vec<AddrData>> {
-    Ok(sqlx::query("select id,name,pid from address where pid = $1 order by id asc")
-        .bind(pid)
-        .fetch_all(common::pgsql::db().await)
-        .await?.into_iter().map(|row| {
-        AddrData {
-            id: row.get::<i64, &str>("id") as i32,
-            name: row.get("name"),
-            pid: row.get::<i64, &str>("pid") as i32,
-        }
-    }).collect::<Vec<AddrData>>())
+    Ok(
+        sqlx::query("select id,name,pid from address where pid = $1 order by id asc")
+            .bind(pid)
+            .fetch_all(common::pgsql::db().await)
+            .await?
+            .into_iter()
+            .map(|row| AddrData {
+                id: row.get::<i64, &str>("id") as i32,
+                name: row.get("name"),
+                pid: row.get::<i64, &str>("pid") as i32,
+            })
+            .collect::<Vec<AddrData>>(),
+    )
 }
 
 pub async fn get_addr_name(ids: HashSet<i32>) -> ApiResult<HashMap<i32, AddrData>> {
@@ -187,15 +203,19 @@ pub async fn get_addr_name(ids: HashSet<i32>) -> ApiResult<HashMap<i32, AddrData
 
     let placeholder = placeholder.trim_matches(',');
 
-    let address: Vec<AddrData> = sqlx::query_with(&*("select id,name,pid from address where id in ("
-        .to_owned() + placeholder + ")"), arg)
-        .fetch_all(common::pgsql::db().await).await?.into_iter().map(|row| {
-        AddrData {
-            id: row.get::<i64, &str>("id") as i32,
-            name: row.get::<String, &str>("name"),
-            pid: row.get::<i64, &str>("pid") as i32,
-        }
-    }).collect::<Vec<AddrData>>();
+    let address: Vec<AddrData> = sqlx::query_with(
+        &*("select id,name,pid from address where id in (".to_owned() + placeholder + ")"),
+        arg,
+    )
+    .fetch_all(common::pgsql::db().await)
+    .await?
+    .into_iter()
+    .map(|row| AddrData {
+        id: row.get::<i64, &str>("id") as i32,
+        name: row.get::<String, &str>("name"),
+        pid: row.get::<i64, &str>("pid") as i32,
+    })
+    .collect::<Vec<AddrData>>();
 
     let mut result: HashMap<i32, AddrData> = HashMap::with_capacity(address.len());
     for item in address {

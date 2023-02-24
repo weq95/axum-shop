@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Deserialize, Serialize, Default, Clone)]
+#[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct GetUser {
     pub id: u64,
     pub age: u8,
@@ -10,11 +10,8 @@ pub struct GetUser {
     pub email: String,
 }
 
-
 #[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct ListUser {
     pub users: Vec<GetUser>,
     pub total: u64,
 }
-
-
