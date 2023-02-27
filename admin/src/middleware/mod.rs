@@ -12,7 +12,7 @@ use common::jwt::JWT;
 use common::ApiResponse;
 
 /// 登录守卫
-pub async fn guard<B>(
+pub async fn auth_guard<B>(
     TypedHeader(auth): TypedHeader<Authorization<Bearer>>,
     mut req: Request<B>,
     next: Next<B>,

@@ -63,8 +63,6 @@ pub struct Claims {
     pub user_type: UserType,
     //昵称
     pub username: String,
-    //角色
-    pub role: String,
     //账号
     pub email: String,
     //来源
@@ -97,10 +95,9 @@ impl JWT {
         id: i64,
         email: String,
         username: String,
-        source: UserSource,
         agency_code: String,
+        source: UserSource,
         user_type: UserType,
-        role: String,
     ) -> Claims {
         Claims {
             id,
@@ -108,7 +105,6 @@ impl JWT {
             agency_code,
             username,
             user_type,
-            role,
             from: source,
             iss: self.iss.clone(),
             exp: self.calc_claim_exp(),
@@ -163,13 +159,12 @@ mod test {
     fn test_gen_token() {
         let jwt = JWT::default();
         let claims = jwt.new_claims(
-            1,
+            1i64,
             "1842618766@qq.com".to_string(),
             "weq".to_string(),
-            UserSource::PC,
             "AFC".to_string(),
-            UserType::User,
-            "super_admin".to_string(),
+            UserSource::Admin,
+            UserType::SuperAdmin,
         );
         let token = jwt.token(&claims).unwrap();
         println!("success. \r\n{:?}", token);
