@@ -1,5 +1,5 @@
 use axum::middleware as AxumMiddleware;
-use axum::routing::{get, post, delete};
+use axum::routing::{delete, get, post};
 use axum::Router;
 use tower::ServiceBuilder;
 

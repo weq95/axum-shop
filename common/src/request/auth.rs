@@ -16,7 +16,7 @@ pub struct ReqRolePermissions {
     #[validate(length(min = 3, max = 100, message = "名称必须在3-100字之间"))]
     pub role_name: Option<String>,
     #[validate(length(min = 1, max = 100, message = "对象必须在1-100字之间"))]
-    pub object: Option<String>,
+    pub subject: Option<String>,
     #[validate(required)]
     pub action: Option<String>,
     #[validate(required)]

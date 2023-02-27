@@ -106,7 +106,7 @@ pub async fn add_role_permissions(
     let permissions: Vec<RolePermissions> = payload
         .into_iter()
         .map(|row| RolePermissions {
-            object: row.object.clone().unwrap(),
+            object: row.subject.clone().unwrap(),
             action: row.action.clone().unwrap(),
             domain: row.domain.clone().unwrap(),
             role_name: row.role_name.clone().unwrap(),
@@ -127,7 +127,7 @@ pub async fn delete_role_permission(Json(payload): Json<ReqRolePermissions>) -> 
     }
 
     let result: Vec<RolePermissions> = vec![RolePermissions {
-        object: payload.object.clone().unwrap(),
+        object: payload.subject.clone().unwrap(),
         action: payload.action.clone().unwrap(),
         domain: payload.domain.clone().unwrap(),
         role_name: payload.role_name.clone().unwrap(),

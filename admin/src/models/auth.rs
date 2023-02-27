@@ -221,10 +221,12 @@ pub async fn delete_user_permissions(user_permissions: Vec<RoleUser>) -> ApiResu
     for perm in user_permissions {
         let user_id = format!("user:{}", perm.user_id);
         let _ = enforcer
-            .remove_filtered_grouping_policy(
-                0,
-                vec![user_id, perm.role_name.clone(), perm.domain.clone()],
-            )
+            .remove_policy(vec![
+                "g".to_string(),
+                user_id,
+                perm.role_name.clone(),
+                perm.domain.clone(),
+            ])
             .await;
     }
 

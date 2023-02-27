@@ -120,7 +120,7 @@ where
                     return Ok(response_fn(
                         StatusCode::UNAUTHORIZED,
                         "验证用户不存在".to_string(),
-                    ))
+                    ));
                 }
             };
 
@@ -627,9 +627,8 @@ impl Adapter for PgSqlAdapter {
         for rule in rules {
             let rule = normalize_casbin_rule(rule);
             sqlx::query(
-                r#" DELETE FROM casbin_rule WHERE
-                    ptype = $1 AND v0 = $2 AND v1 = $3 AND
-                    v2 = $4 AND v3 = $5 AND v4 = $6 AND v5 = $7"#,
+                "DELETE FROM casbin_rule WHERE ptype = $1 AND v0 = $2 AND v1 = $3 AND
+                    v2 = $4 AND v3 = $5 AND v4 = $6 AND v5 = $7",
             )
             .bind(ptype)
             .bind(&rule[0])
@@ -691,7 +690,7 @@ impl Adapter for PgSqlAdapter {
                     + v_field_n.clone().as_str()
                     + ")) and "),
             );
-            arg.add(&field_vals[idx]);
+            arg.add(&field_vals[idx - 1]);
 
             idx += 1;
             counter -= 1;
