@@ -99,3 +99,81 @@ pub struct SchoolJson {
     pub location: String,
     pub status_log: Vec<String>,
 }
+
+/// 通用分页结构
+#[derive(Serialize)]
+pub struct Pagination<T> {
+    data: Vec<T>,
+    // 总条数
+    total: usize,
+    // 页大小
+    per_page: usize,
+    // 当前页
+    current_page: usize,
+}
+
+impl<T> Pagination<T> {
+    pub fn new(result: Vec<T>) -> Self {
+        Self {
+            data: result,
+            total: 15usize,
+            per_page: 15usize,
+            current_page: 1usize,
+        }
+    }
+
+    /// 设置总页数
+    pub fn set_total(&mut self, total: usize) -> &mut Pagination<T> {
+        self.total = total;
+
+        self
+    }
+
+    /// 设置分页大小
+    pub fn set_per_page(&mut self, per_page: usize) -> &mut Pagination<T> {
+        self.per_page = per_page;
+
+        self
+    }
+
+    /// 计算总页数
+    pub fn total_pages(&mut self) -> usize {
+        if self.total % self.per_page == 0 {
+            return self.total / self.per_page;
+        }
+
+        (self.total / self.per_page) + 1
+    }
+
+    /// 是否存在上一页
+    pub fn has_previous_page(&self) -> bool {
+        self.current_page > 1
+    }
+
+    /// 是否存在下一页
+    pub fn has_next_page(&mut self) -> bool {
+        self.current_page < self.total_pages()
+    }
+
+    /// 上一页页码
+    pub fn previous_page_number(&mut self) -> Option<usize> {
+        if self.has_previous_page() {
+            return Some(self.current_page - 1);
+        }
+
+        None
+    }
+
+    /// 下一页页码
+    pub fn next_page_number(&mut self) -> Option<usize> {
+        if self.has_next_page() {
+            return Some(self.current_page + 1);
+        }
+
+        None
+    }
+
+    pub fn get_data(&self) -> &[T] {
+        &self.data
+    }
+}

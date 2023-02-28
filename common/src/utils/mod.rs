@@ -4,6 +4,7 @@ use serde::de::DeserializeOwned;
 use serde_json::Value;
 
 pub mod casbin;
+pub mod file;
 pub mod jwt;
 pub mod pgsql;
 pub mod pwd;

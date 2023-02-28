@@ -14,7 +14,7 @@ axum = { version = "0.6", features = ["multipart", "ws"] }
 serde_json = { version = "1.0" }
 serde = { version = "1.0", features = ["derive"] }
 chrono = { version = "0.4", features = ["unstable-locales"] }
-validator = { version = "0.15", features = ["derive", "phone"] }
+validator = { version = "0.15", features = ["derive", "phone", "unic"] }
 sqlx = { version = "0.6", features = ["runtime-tokio-native-tls", "postgres", "chrono"] }
 md5 = "0.7"
 tokio-postgres = { version = "0.7" }

@@ -3,12 +3,14 @@ use axum::http::{Request, StatusCode};
 use axum::response::{IntoResponse, Response};
 use axum::{async_trait, Form, Json, RequestExt};
 use http::header::CONTENT_TYPE;
+use serde::Serialize;
 
 use crate::jwt::Claims;
 use crate::ApiResponse;
 
 pub mod address;
 pub mod auth;
+pub mod products;
 pub mod user;
 
 /// 存储HTTPBody数据, 当前登录用户信息

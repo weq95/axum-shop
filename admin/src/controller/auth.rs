@@ -9,10 +9,7 @@ use common::{
     parse_field, ApiResponse,
 };
 
-use crate::models::auth::{
-    delete_role_permissions, delete_user_permissions, get_casbin_rules, permissions_for_role,
-    permissions_for_user, role_permissions, roles_for_user, user_roles, RolePermissions, RoleUser,
-};
+use crate::models::auth::{AdminAuth, RolePermissions, RoleUser};
 
 /// 获取角色所有得权限
 pub async fn get_permissions_for_role(Json(payload): Json<Value>) -> impl IntoResponse {
@@ -29,7 +26,7 @@ pub async fn get_permissions_for_role(Json(payload): Json<Value>) -> impl IntoRe
         }
     };
 
-    match permissions_for_role(role_id, domain).await {
+    match AdminAuth::permissions_for_role(role_id, domain).await {
         Ok(result) => ApiResponse::response(Some(result)).json(),
         Err(e) => ApiResponse::fail_msg(e.to_string()).json(),
     }
@@ -46,7 +43,7 @@ pub async fn get_roles_for_user(Json(payload): Json<Value>) -> impl IntoResponse
         None => return ApiResponse::fail_msg("参数错误".to_string()).json(),
     };
 
-    match roles_for_user(user_id, domain).await {
+    match AdminAuth::roles_for_user(user_id, domain).await {
         Ok(result) => ApiResponse::response(Some(result)).json(),
         Err(e) => ApiResponse::fail_msg(e.to_string()).json(),
     }
@@ -62,7 +59,7 @@ pub async fn get_permissions_for_user(Json(payload): Json<Value>) -> impl IntoRe
         Some(domain) => domain,
         None => return ApiResponse::fail_msg("参数错误".to_string()).json(),
     };
-    match permissions_for_user(user_id, domain).await {
+    match AdminAuth::permissions_for_user(user_id, domain).await {
         Ok(result) => ApiResponse::response(Some(result)).json(),
         Err(e) => ApiResponse::fail_msg(e.to_string()).json(),
     }
@@ -75,7 +72,7 @@ pub async fn add_user_roles(Json(payload): Json<ReqRoleUser>) -> impl IntoRespon
         Ok(_) => {}
     }
     let role_names = HashSet::from([payload.name.unwrap()]);
-    let rules = match get_casbin_rules(role_names).await {
+    let rules = match AdminAuth::get_casbin_rules(role_names).await {
         Ok(result) => result,
         Err(e) => {
             return ApiResponse::fail_msg(e.to_string()).json();
@@ -83,7 +80,7 @@ pub async fn add_user_roles(Json(payload): Json<ReqRoleUser>) -> impl IntoRespon
     };
 
     ApiResponse::response(Some(
-        user_roles(
+        AdminAuth::user_roles(
             payload.user_id.unwrap(),
             payload.domain.unwrap().clone(),
             rules,
@@ -116,7 +113,7 @@ pub async fn add_role_permissions(
         return ApiResponse::fail_msg("没有需要添加的权限".to_string()).json();
     }
 
-    ApiResponse::response(Some(role_permissions(permissions).await)).json()
+    ApiResponse::response(Some(AdminAuth::role_permissions(permissions).await)).json()
 }
 
 /// 删除角色
@@ -132,7 +129,7 @@ pub async fn delete_role_permission(Json(payload): Json<ReqRolePermissions>) -> 
         domain: payload.domain.clone().unwrap(),
         role_name: payload.role_name.clone().unwrap(),
     }];
-    match delete_role_permissions(result).await {
+    match AdminAuth::delete_role_permissions(result).await {
         Ok(bool_val) => ApiResponse::response(Some(bool_val)).json(),
         Err(e) => ApiResponse::fail_msg(e.to_string()).json(),
     }
@@ -151,7 +148,7 @@ pub async fn delete_user_permission(Json(payload): Json<ReqRoleUser>) -> impl In
         role_name: payload.name.unwrap(),
     }];
 
-    match delete_user_permissions(result).await {
+    match AdminAuth::delete_user_permissions(result).await {
         Ok(bool_val) => ApiResponse::response(Some(bool_val)).json(),
         Err(e) => ApiResponse::fail_msg(e.to_string()).json(),
     }

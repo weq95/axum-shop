@@ -9,10 +9,7 @@ use common::request::address::ReqAddressInfo;
 use common::response::address::{ResAddrResult, ResAddress};
 use common::ApiResponse;
 
-use crate::models::address::{
-    addr_result as ModelAddrResult, create as ModelCreate, delete as ModelDelete, get as ModelGet,
-    get_addr_name as ModelAddrName, list as ModelList, update as ModelUpdate,
-};
+use crate::models::address::{addr_result as AddrResult, get_addr_name as AddrName, UserAddress};
 use crate::AppState;
 
 /// 获取用户收获地址详情
@@ -21,11 +18,11 @@ pub async fn get_address(
     Path(id): Path<i64>,
 ) -> impl IntoResponse {
     let userid = 1i64;
-    let info = ModelGet(id, userid).await.unwrap();
+    let info = UserAddress::get(id, userid).await.unwrap();
     if info.id == 0 {
         return ApiResponse::fail_msg("为获取到用户收获地址信息".to_string()).json();
     }
-    let address = ModelAddrName(HashSet::from([
+    let address = AddrName(HashSet::from([
         info.province,
         info.city,
         info.district,
@@ -59,7 +56,7 @@ pub async fn get_address(
 /// 用户收获地址列表
 pub async fn list_address(Extension(_state): Extension<Arc<AppState>>) -> impl IntoResponse {
     let userid = 1i64;
-    let data = ModelList(userid).await.unwrap();
+    let data = UserAddress::list(userid).await.unwrap();
     let mut result: Vec<ResAddress> = Vec::with_capacity(data.len());
 
     let mut ids = HashSet::new();
@@ -69,7 +66,7 @@ pub async fn list_address(Extension(_state): Extension<Arc<AppState>>) -> impl I
         ids.insert(i.district);
         ids.insert(i.street);
     }
-    let address = ModelAddrName(ids).await.unwrap();
+    let address = AddrName(ids).await.unwrap();
 
     for i in data {
         result.push(ResAddress {
@@ -96,7 +93,7 @@ pub async fn create_address(
     Json(info): Json<ReqAddressInfo>,
 ) -> impl IntoResponse {
     let userid = 1i64;
-    ApiResponse::response(Some(ModelCreate(userid, info).await)).json()
+    ApiResponse::response(Some(UserAddress::create(userid, info).await)).json()
 }
 
 /// 用户更新收获地址
@@ -106,7 +103,7 @@ pub async fn update_address(
     Json(info): Json<ReqAddressInfo>,
 ) -> impl IntoResponse {
     let userid = 1i64;
-    ApiResponse::response(Some(ModelUpdate(id, userid, info).await)).json()
+    ApiResponse::response(Some(UserAddress::update(id, userid, info).await)).json()
 }
 
 /// 用户删除收获地址
@@ -115,7 +112,7 @@ pub async fn delete_address(
     Path(id): Path<i64>,
 ) -> impl IntoResponse {
     let userid = 1i64;
-    ApiResponse::response(Some(ModelDelete(id, userid).await)).json()
+    ApiResponse::response(Some(UserAddress::delete(id, userid).await)).json()
 }
 
 /// 获取收获地址资源
@@ -123,7 +120,7 @@ pub async fn addr_result(
     Extension(_state): Extension<Arc<AppState>>,
     Path(pid): Path<i32>,
 ) -> impl IntoResponse {
-    let result = ModelAddrResult(pid).await.unwrap();
+    let result = AddrResult(pid).await.unwrap();
     let mut data = Vec::with_capacity(result.len());
     for item in result {
         data.push(ResAddrResult {

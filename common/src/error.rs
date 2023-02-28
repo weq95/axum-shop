@@ -4,12 +4,13 @@ use std::io::Error;
 use std::num::ParseIntError;
 use std::str::Utf8Error;
 
+use axum::extract::multipart::MultipartError;
 use axum::http::StatusCode;
 use axum::response::{IntoResponse, Response};
 use chrono::ParseError;
 use redis::RedisError;
-use serde::de::Visitor;
 use serde::{Deserialize, Deserializer, Serialize};
+use serde::de::Visitor;
 use validator::{ValidationError, ValidationErrors};
 
 /// 返回资源类型
@@ -146,6 +147,12 @@ impl From<Infallible> for ApiError {
     }
 }
 
+impl From<MultipartError> for ApiError {
+    fn from(value: MultipartError) -> Self {
+        ApiError::Error(value.to_string())
+    }
+}
+
 struct ApiVisitor;
 
 impl<'de> Visitor<'de> for ApiVisitor {
@@ -156,15 +163,15 @@ impl<'de> Visitor<'de> for ApiVisitor {
     }
 
     fn visit_str<E>(self, v: &str) -> Result<Self::Value, E>
-    where
-        E: serde::de::Error,
+        where
+            E: serde::de::Error,
     {
         Ok(v.to_string())
     }
 
     fn visit_string<E>(self, v: String) -> Result<Self::Value, E>
-    where
-        E: serde::de::Error,
+        where
+            E: serde::de::Error,
     {
         Ok(v)
     }
@@ -172,8 +179,8 @@ impl<'de> Visitor<'de> for ApiVisitor {
 
 impl<'de> Deserialize<'de> for ApiError {
     fn deserialize<D>(de: D) -> Result<Self, D::Error>
-    where
-        D: Deserializer<'de>,
+        where
+            D: Deserializer<'de>,
     {
         Ok(ApiError::Error(de.deserialize_string(ApiVisitor)?))
     }
