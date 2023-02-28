@@ -2,13 +2,16 @@ use std::ops::DerefMut;
 use std::sync::Arc;
 
 use axum::{
+    body::Body,
     extract::{Path, Query},
+    http::Request,
     response::IntoResponse,
     Extension, Json,
 };
 use serde_json::json;
 use validator::Validate;
 
+use common::jwt::Claims;
 use common::{
     jwt::{UserSource, UserType, JWT},
     request::user::{ReqCrateUser, ReqGetUser, ReqLogin, ReqQueryUser, ReqUpdateUser},
@@ -65,7 +68,7 @@ pub async fn login(Json(payload): Json<ReqLogin>) -> impl IntoResponse {
     }
 
     let jwt = JWT::default();
-    let claims = jwt.new_claims(
+    let mut claims = jwt.new_claims(
         user.id as i64,
         user.email.clone(),
         user.name.clone(),
@@ -73,11 +76,15 @@ pub async fn login(Json(payload): Json<ReqLogin>) -> impl IntoResponse {
         UserSource::PC,
         UserType::User,
     );
-    if let Ok(token) = jwt.token(&claims) {
-        return ApiResponse::response(Some(json!({ "token": token }))).json();
-    }
 
-    ApiResponse::fail_msg("登录失败,请稍后重试".to_string()).json()
+    match jwt.token_info(&mut claims) {
+        Ok((access_token, refresh_token)) => ApiResponse::response(Some(json!({
+            "access_token": access_token,
+            "refresh_token":refresh_token,
+        })))
+        .json(),
+        Err(_) => ApiResponse::fail_msg("登录失败, 请稍后重试".to_string()).json(),
+    }
 }
 
 /// 创建用户
@@ -138,4 +145,18 @@ pub async fn user_list(
     Query(parma): Query<ReqQueryUser>,
 ) -> impl IntoResponse {
     ApiResponse::response(Some(ModelList(parma).await)).json()
+}
+
+pub async fn refresh_token(mut req: Request<Body>) -> impl IntoResponse {
+    match req.extensions_mut().get_mut::<Claims>() {
+        Some(claims) => match JWT::default().token_info(claims) {
+            Ok((access_token, refresh_token)) => ApiResponse::response(Some(json!({
+                "access_token": access_token,
+                "refresh_token":refresh_token,
+            })))
+            .json(),
+            Err(_) => ApiResponse::fail_msg("refresh_token 刷新失败[02]".to_string()).json(),
+        },
+        None => ApiResponse::fail_msg("refresh_token 刷新失败[01]".to_string()).json(),
+    }
 }

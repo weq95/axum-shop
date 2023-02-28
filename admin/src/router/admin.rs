@@ -13,6 +13,7 @@ use crate::controller::{
         add_role_permissions, add_user_roles, delete_role_permission, delete_user_permission,
         get_permissions_for_role, get_permissions_for_user, get_roles_for_user,
     },
+    refresh_token,
     user::{
         create_admin, delete_admin, get_admin, login, register, test_redis, update_admin, user_list,
     },
@@ -61,6 +62,7 @@ pub async fn admin() -> Router {
     Router::new().nest(
         "/admin",
         Router::new()
+            .route("/refresh_token", post(refresh_token))
             .merge(users)
             .merge(address)
             .merge(auth)

@@ -73,6 +73,14 @@ pub struct Claims {
     pub exp: i64,
     //签发机构
     iss: String,
+    //token的类型
+    token_type: String,
+}
+
+impl Claims {
+    pub fn token_type(&self) -> String {
+        self.token_type.clone()
+    }
 }
 
 impl Default for JWT {
@@ -108,6 +116,7 @@ impl JWT {
             from: source,
             iss: self.iss.clone(),
             exp: self.calc_claim_exp(),
+            token_type: "".to_string(),
         }
     }
 
@@ -129,9 +138,22 @@ impl JWT {
         .map_err(ApiError::from)
     }
 
-    /// 刷新token
-    pub fn refresh_token(&self, claims: &mut Claims) -> ApiResult<String> {
+    pub fn token_info(&self, claims: &mut Claims) -> ApiResult<(String, String)> {
+        Ok((self.access_token(claims)?, self.refresh_token(claims)?))
+    }
+
+    /// access_token 有效期: 20分钟
+    pub fn access_token(&self, claims: &mut Claims) -> ApiResult<String> {
+        claims.token_type = "access_token".to_string();
         claims.exp = self.calc_claim_exp();
+
+        self.token(claims)
+    }
+
+    /// refresh_token 有效期: 15天
+    pub fn refresh_token(&self, claims: &mut Claims) -> ApiResult<String> {
+        claims.token_type = "refresh_token".to_string();
+        claims.exp = (Utc::now() + Duration::days(15i64)).timestamp();
 
         self.token(claims)
     }
