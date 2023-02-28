@@ -1,6 +1,6 @@
-use axum::Router;
 use crate::controller::upload_file;
 use axum::routing::post;
+use axum::Router;
 
 mod admin;
 mod home;

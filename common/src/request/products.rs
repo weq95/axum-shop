@@ -1,7 +1,15 @@
+use std::collections::HashMap;
+
 use serde::{Deserialize, Serialize};
 use validator::{Validate, ValidationError};
 
-pub struct ReqQueryProduct {}
+#[derive(Deserialize, Serialize)]
+pub struct ReqQueryProduct {
+    pub page_num: Option<u32>,
+    pub page_size: Option<u32>,
+    pub title: Option<String>,
+    pub condition: Option<HashMap<String, String>>,
+}
 
 #[derive(Debug, Serialize, Deserialize, Validate)]
 pub struct ReqProduct {

@@ -1,18 +1,21 @@
-use axum::extract::Path;
+use axum::extract::{Path, Query};
 use axum::response::IntoResponse;
 use axum::Json;
 use serde_json::json;
 use validator::Validate;
 
-use common::products::ReqProduct;
+use common::products::{ReqProduct, ReqQueryProduct};
 use common::ApiResponse;
 
 use crate::models::product_skus::ProductSku;
 use crate::models::products::Product;
 
 /// 商品列表
-pub async fn products() -> impl IntoResponse {
-    todo!()
+pub async fn products(Query(payload): Query<ReqQueryProduct>) -> impl IntoResponse {
+    match Product::products(payload).await {
+        Ok(request) => ApiResponse::response(Some(request)).json(),
+        Err(e) => ApiResponse::fail_msg(e.to_string()).json(),
+    }
 }
 
 /// 商品详情
