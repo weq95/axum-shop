@@ -40,5 +40,6 @@ pub struct ReqProductSku {
 
 /// 检测商品是否已存在
 fn unique_title(_title: &str) -> Result<(), ValidationError> {
+    return Ok(());
     Err(ValidationError::new("商品名称已存在"))
 }

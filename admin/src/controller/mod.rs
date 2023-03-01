@@ -1,8 +1,16 @@
-use axum::extract::Multipart;
-use axum::response::IntoResponse;
+use std::collections::HashMap;
 
-use common::error::{ApiError, ApiResult};
+use axum::body::Body;
+use axum::extract::{Multipart, Path, Query};
+use axum::Json;
+use axum::response::IntoResponse;
+use http::StatusCode;
+use random::Source;
+use serde_json::json;
+use tokio::io::AsyncWriteExt;
+
 use common::ApiResponse;
+use common::error::{ApiError, ApiResult};
 pub use user::*;
 
 pub mod address;
@@ -11,25 +19,71 @@ pub mod product_skus;
 pub mod products;
 pub mod user;
 
+/// 文件上传
 pub async fn upload_file(multipart: Multipart) -> impl IntoResponse {
-    upload_images(multipart).await;
-    ApiResponse::<i32>::response(None).json()
+    let date = chrono::Local::now().format("%Y-%m").to_string();
+    let filepath = "./files/images/".to_owned() + date.as_str() + "/";
+    match upload_images(filepath, multipart).await {
+        Ok(result) => {
+            if let Some(path) = result {
+                return ApiResponse::response(Some(json!({ "path": path }))).json();
+            }
+
+            ApiResponse::fail_msg("文件上传失败".to_string()).json()
+        }
+        Err(e) => ApiResponse::fail_msg(e.to_string()).json(),
+    }
 }
 
-async fn upload_images(mut multipart: Multipart) -> ApiResult<String> {
+/// 读取图片内容
+pub async fn show_image(Query(payload): Query<HashMap<String, String>>) -> impl IntoResponse {
+    let filepath = match payload.get("path") {
+        Some(path) => path,
+        None => {
+            return ApiResponse::<Vec<u8>>::set_content_type(None)
+                .status(StatusCode::NOT_FOUND)
+                .body(Body::from("文件不存在"))
+                .unwrap()
+                .into_response();
+        }
+    };
+
+    let payload_arr = &filepath.split(".").collect::<Vec<&str>>();
+    let ext_name = payload_arr[payload_arr.len() - 1];
+    let content_type = format!("image/{}", ext_name);
+
+    match tokio::fs::read(filepath).await {
+        Ok(content) => ApiResponse::<Vec<u8>>::set_content_type(Some(&content_type))
+            .body(Body::from(content))
+            .unwrap()
+            .into_response(),
+        Err(_e) => ApiResponse::<Vec<u8>>::set_content_type(None)
+            .status(StatusCode::NOT_FOUND)
+            .body(Body::from("读取文件失败"))
+            .unwrap()
+            .into_response(),
+    }
+}
+
+/// 上传图片
+async fn upload_images(filepath: String, mut multipart: Multipart) -> ApiResult<Option<String>> {
+    let mut path: Option<String> = None;
     while let Some(mut field) = multipart.next_field().await? {
-        let content_type = field.content_type().unwrap().to_string();
-        // let random_number = (random::<f32>() * 1000000000 as f32) as i32;
+        let mut content_type = field.content_type().unwrap().to_string();
+        tokio::fs::create_dir_all(filepath.clone()).await?;
         if !&content_type.contains("image/") {
-            return Err(ApiError::Error("不允许上传次类型文件".to_string()));
+            return Err(ApiError::Error("不允许上传此类型文件".to_string()));
         }
 
-        println!("content_type: {}", content_type);
+        let dst = filepath.to_owned() + field.file_name().unwrap();
+        path = Some(dst.clone());
+        let mut new_file = tokio::fs::File::create(dst).await?;
         while let Some(chunk) = field.chunk().await? {
-            println!("received {} bytes", chunk.len());
+            new_file.write_all(&chunk).await?;
         }
+
+        new_file.sync_all().await?;
     }
 
-    println!("success !!!");
-    Ok("".to_string())
+    Ok(path)
 }

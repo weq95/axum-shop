@@ -17,7 +17,6 @@ chrono = { version = "0.4", features = ["unstable-locales"] }
 validator = { version = "0.15", features = ["derive", "phone", "unic"] }
 sqlx = { version = "0.6", features = ["runtime-tokio-native-tls", "postgres", "chrono"] }
 md5 = "0.7"
-tokio-postgres = { version = "0.7" }
 lazy_static = "1.4"
 jsonwebtoken = "8.2"
 async_once = "0.2"

@@ -1,8 +1,9 @@
 use std::collections::HashMap;
 use std::fmt::Debug;
 
-use axum::response::IntoResponse;
 use axum::{body::Body, response::Response};
+use axum::response::IntoResponse;
+use http::response::Builder;
 use serde::{Deserialize, Serialize};
 
 pub mod address;
@@ -76,12 +77,20 @@ impl<T: Serialize> ApiResponse<T> {
         self.response_body().into_response()
     }
 
-    pub fn response_body(&self) -> Response<Body> {
+    /// 设置返回数据类型
+    pub fn set_content_type(content_type: Option<&str>) -> Builder {
         Response::builder()
             .extension(|| {})
             .header("Access-Control-Allow-Origin", "*")
-            .header("Content-Type", "text/json; charset=UTF-8")
             .header("Cache-Control", "no-cache")
+            .header(
+                "Content-Type",
+                content_type.unwrap_or("text/json; charset=UTF-8"),
+            )
+    }
+
+    pub fn response_body(&self) -> Response<Body> {
+        Self::set_content_type(None)
             .body(Body::from(self.to_string()))
             .unwrap()
     }

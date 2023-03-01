@@ -1,16 +1,18 @@
+use std::any::Any;
 use std::collections::HashMap;
 
 use serde::{Deserialize, Serialize};
-use sqlx::Row;
+use serde_json::json;
+use sqlx::{Executor, Row};
 
 use common::error::ApiResult;
-use common::products::ReqQueryProduct;
 use common::Paginate;
+use common::products::ReqQueryProduct;
 
-use crate::models::product_skus::ProductSku;
+use crate::models::product_skus::ProductSkuModel;
 
 #[derive(Debug, Serialize, Deserialize, Default)]
-pub struct Product {
+pub struct ProductModel {
     pub id: u64,
     pub title: String,
     pub description: String,
@@ -20,31 +22,42 @@ pub struct Product {
     pub sold_count: u32,
     pub review_count: u32,
     pub price: f64,
-    pub skus: Vec<ProductSku>,
+    pub skus: Vec<ProductSkuModel>,
 }
 
-impl Product {
+impl ProductModel {
     /// 创建
-    pub async fn create(product: Self) -> ApiResult<u64> {
+    pub async fn create(product: ProductModel) -> ApiResult<u64> {
         let mut transaction = common::pgsql::db().await.begin().await?;
-        let id: u64 = sqlx::query(
-            "insert into product (title, description, image, os_sale) values ($1, $2, $3, $4)",
-        )
-        .bind(&product.title.clone())
-        .bind(&product.description.clone())
-        .bind(&product.image.clone().join(","))
-        .bind(product.on_sale)
-        .fetch_one(&mut transaction)
-        .await?
-        .get::<i64, &str>("id") as u64;
 
-        ProductSku::delete_product_sku(id, &mut transaction).await?;
-        if false == ProductSku::add_product_sku(product.skus, &mut transaction).await? {
+        let product_sku = product
+            .skus
+            .iter()
+            .min_by(|a, b| a.price.partial_cmp(&b.price).unwrap())
+            .unwrap();
+
+        let id = sqlx::query(
+            "insert into products (title, description, image, on_sale, sku_price) values ($1, $2, $3, $4, $5)",
+        )
+            .bind(&product.title.clone())
+            .bind(&product.description.clone())
+            .bind(&json!(product.image.clone()))
+            .bind(&product.on_sale.clone())
+            .bind(product_sku.price)
+            .execute(&mut transaction)
+            .await?.type_id();
+
+        dbg!(id);
+        return Ok(0u64);
+
+       /* ProductSkuModel::delete_product_sku(id, &mut transaction).await?;
+        if false == ProductSkuModel::add_product_sku(&product.skus, &mut transaction).await? {
             return Ok(0u64);
         }
         //添加sku
         transaction.commit().await?;
-        Ok(id)
+        Ok(id as u64)*/
+
     }
 
     pub async fn get(product_id: u64) -> ApiResult<Self> {
@@ -52,7 +65,7 @@ impl Product {
     }
 
     /// 列表
-    pub async fn products(payload: ReqQueryProduct) -> ApiResult<Paginate<Product>> {
+    pub async fn products(payload: ReqQueryProduct) -> ApiResult<Paginate<ProductModel>> {
         todo!()
     }
 

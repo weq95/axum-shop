@@ -5,6 +5,7 @@ use tower::ServiceBuilder;
 
 use middleware::casbin::CasbinAuthLayer;
 
+use crate::controller::products::ProductController;
 use crate::controller::{
     address::{
         addr_result, create_address, delete_address, get_address, list_address, update_address,
@@ -58,6 +59,10 @@ pub async fn admin() -> Router {
             .route("/delete_role_permission", delete(delete_role_permission))
             .route("/delete_user_permission", delete(delete_user_permission)),
     );
+    let products = Router::new().nest(
+        "/products",
+        Router::new().route("/", post(ProductController::create)),
+    );
 
     Router::new().nest(
         "/admin",
@@ -66,6 +71,7 @@ pub async fn admin() -> Router {
             .merge(users)
             .merge(address)
             .merge(auth)
+            .merge(products)
             .layer(
                 ServiceBuilder::new()
                     .layer(AxumMiddleware::from_fn(middleware::auth_guard))

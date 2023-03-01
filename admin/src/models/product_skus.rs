@@ -4,7 +4,7 @@ use sqlx::{Postgres, Transaction};
 use common::error::ApiResult;
 
 #[derive(Debug, Deserialize, Serialize, Default)]
-pub struct ProductSku {
+pub struct ProductSkuModel {
     pub id: u64,
     pub title: String,
     pub description: String,
@@ -13,10 +13,10 @@ pub struct ProductSku {
     pub product_id: u64,
 }
 
-impl ProductSku {
+impl ProductSkuModel {
     /// 添加商品的sku
     pub async fn add_product_sku(
-        skus: Vec<ProductSku>,
+        skus: &Vec<ProductSkuModel>,
         transaction: &mut Transaction<'_, Postgres>,
     ) -> ApiResult<bool> {
         let mut sql = sqlx::QueryBuilder::new(
@@ -58,7 +58,7 @@ impl ProductSku {
         product_id: u64,
         transaction: &mut Transaction<'_, Postgres>,
     ) -> ApiResult<bool> {
-        let rows_num = sqlx::query("delete from products_skus where product_id = $1")
+        let rows_num = sqlx::query("delete from product_skus where product_id = $1")
             .bind(product_id as i64)
             .execute(transaction)
             .await?
