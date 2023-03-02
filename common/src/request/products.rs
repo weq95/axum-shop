@@ -1,12 +1,13 @@
 use std::collections::HashMap;
 
 use serde::{Deserialize, Serialize};
+use sqlx::types::Json;
 use validator::{Validate, ValidationError};
 
 #[derive(Deserialize, Serialize)]
 pub struct ReqQueryProduct {
-    pub page_num: Option<u32>,
-    pub page_size: Option<u32>,
+    pub page_num: Option<i32>,
+    pub page_size: Option<i32>,
     pub title: Option<String>,
     pub condition: Option<HashMap<String, String>>,
 }
@@ -17,7 +18,7 @@ pub struct ReqProduct {
     #[validate(length(min = 3, max = 100), custom = "unique_title")]
     pub title: Option<String>,
     #[validate(required)]
-    pub image: Option<Vec<String>>,
+    pub image: Option<Json<String>>,
     #[validate(required)]
     pub description: Option<String>,
     #[validate(required)]
@@ -35,7 +36,7 @@ pub struct ReqProductSku {
     #[validate(range(min = 0.01f64))]
     pub price: Option<f64>,
     #[validate(range(min = 1))]
-    pub stock: Option<u64>,
+    pub stock: Option<i32>,
 }
 
 /// 检测商品是否已存在

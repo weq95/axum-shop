@@ -22,7 +22,7 @@ impl ProductController {
     }
 
     /// 商品详情
-    pub async fn get(Path(product_id): Path<u64>) -> impl IntoResponse {
+    pub async fn get(Path(product_id): Path<i64>) -> impl IntoResponse {
         if product_id == 0 {
             return ApiResponse::fail_msg("商品不存在".to_string()).json();
         }

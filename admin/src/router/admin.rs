@@ -61,7 +61,9 @@ pub async fn admin() -> Router {
     );
     let products = Router::new().nest(
         "/products",
-        Router::new().route("/", post(ProductController::create)),
+        Router::new()
+            .route("/", post(ProductController::create))
+            .route("/:id", get(ProductController::get)),
     );
 
     Router::new().nest(

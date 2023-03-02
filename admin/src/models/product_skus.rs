@@ -1,66 +1,69 @@
 use serde::{Deserialize, Serialize};
-use sqlx::{Postgres, Transaction};
+use sqlx::{Postgres, QueryBuilder, Transaction};
 
 use common::error::ApiResult;
 
-#[derive(Debug, Deserialize, Serialize, Default)]
+#[derive(Debug, Deserialize, Serialize, Default, sqlx::FromRow)]
 pub struct ProductSkuModel {
-    pub id: u64,
+    pub id: i64,
     pub title: String,
     pub description: String,
     pub price: f64,
-    pub stock: u64,
-    pub product_id: u64,
+    pub stock: i32,
+    pub product_id: i64,
 }
 
+
 impl ProductSkuModel {
+    pub async fn get(id: i64) -> ApiResult<Self> {
+        let result: Self = sqlx::query_as("select * from product_skus where id = $1")
+            .bind(id)
+            .fetch_one(common::pgsql::db().await)
+            .await?;
+
+        Ok(result)
+    }
+
+    /// 获取某商品的全部sku
+    pub async fn skus(product_id: i64) -> ApiResult<Vec<Self>> {
+        let result: Vec<Self> = sqlx::query_as("select * from product_skus where product_id = $1")
+            .bind(product_id)
+            .fetch_all(common::pgsql::db().await)
+            .await?;
+
+        Ok(result)
+    }
+
     /// 添加商品的sku
     pub async fn add_product_sku(
+        product_id: i64,
         skus: &Vec<ProductSkuModel>,
-        transaction: &mut Transaction<'_, Postgres>,
+        tx: &mut Transaction<'_, Postgres>,
     ) -> ApiResult<bool> {
-        let mut sql = sqlx::QueryBuilder::new(
-            "insert into product_skus (title, description, price, stock, product_id) values ",
+        let mut query_build: QueryBuilder<Postgres> = sqlx::QueryBuilder::new(
+            "insert into product_skus (title, description, price, stock, product_id) ",
         );
 
-        let mut idx = 1;
-        // ($1, $1, $3, $4)
-        let sku_len = skus.len();
-        for (i, sku) in skus.into_iter().enumerate() {
-            let field1 = (" ($".to_owned() + idx.to_string().as_str()).to_string();
-            sql.push(field1).push_bind(sku.title.clone());
-            idx += 1;
-            let field2 = (",$".to_owned() + idx.to_string().as_str()).to_string();
-            sql.push(field2).push_bind(sku.description.clone());
-            idx += 1;
-            let field3 = (",$".to_owned() + idx.to_string().as_str()).to_string();
-            sql.push(field3).push_bind(sku.price);
-            idx += 1;
-            let field4 = (",$".to_owned() + idx.to_string().as_str()).to_string();
-            sql.push(field4).push_bind(sku.stock as i64);
-            idx += 1;
+        query_build.push_values(skus.as_slice().iter().take(skus.len()), |mut b, sku| {
+            b.push_bind(sku.title.clone())
+                .push_bind(sku.description.clone())
+                .push_bind(sku.price)
+                .push_bind(sku.stock)
+                .push_bind(product_id);
+        });
 
-            let field5 = if i == sku_len - 1 {
-                (",%".to_owned() + idx.to_string().as_str() + ")").to_string()
-            } else {
-                (",%".to_owned() + idx.to_string().as_str() + "), ").to_string()
-            };
-            sql.push(field5).push_bind(sku.product_id as i64);
-            idx += 1;
-        }
-
-        let rows_num = sql.build().execute(transaction).await?.rows_affected();
-        Ok(rows_num as usize == sku_len)
+        let rows_num = query_build.build().execute(tx).await?.rows_affected();
+        Ok(rows_num as usize == skus.len())
     }
 
     /// 删除关联商品的全部sku
     pub async fn delete_product_sku(
-        product_id: u64,
-        transaction: &mut Transaction<'_, Postgres>,
+        product_id: i64,
+        tx: &mut Transaction<'_, Postgres>,
     ) -> ApiResult<bool> {
         let rows_num = sqlx::query("delete from product_skus where product_id = $1")
-            .bind(product_id as i64)
-            .execute(transaction)
+            .bind(product_id)
+            .execute(tx)
             .await?
             .rows_affected();
 
