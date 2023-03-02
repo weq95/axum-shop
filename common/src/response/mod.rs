@@ -1,8 +1,8 @@
 use std::collections::HashMap;
 use std::fmt::Debug;
 
-use axum::{body::Body, response::Response};
 use axum::response::IntoResponse;
+use axum::{body::Body, response::Response};
 use http::response::Builder;
 use serde::{Deserialize, Serialize};
 

@@ -2,15 +2,15 @@ use std::collections::HashMap;
 
 use axum::body::Body;
 use axum::extract::{Multipart, Path, Query};
-use axum::Json;
 use axum::response::IntoResponse;
+use axum::Json;
 use http::StatusCode;
 use random::Source;
 use serde_json::json;
 use tokio::io::AsyncWriteExt;
 
-use common::ApiResponse;
 use common::error::{ApiError, ApiResult};
+use common::ApiResponse;
 pub use user::*;
 
 pub mod address;

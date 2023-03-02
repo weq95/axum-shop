@@ -10,17 +10,17 @@ path = "src/lib.rs"
 
 [dependencies]
 tokio = { version = "1.22.0", features = ["full"] }
-axum = { version = "0.6", features = ["multipart", "ws"] }
-serde_json = { version = "1.0" }
-serde = { version = "1.0", features = ["derive"] }
-chrono = { version = "0.4", features = ["unstable-locales"] }
+axum = { version = "0.6.9", features = ["multipart", "ws"] }
+serde_json = { version = "1.0.93" }
+serde = { version = "1.0.152", features = ["derive"] }
+chrono = { version = "0.4.23", features = ["unstable-locales"] }
 validator = { version = "0.15", features = ["derive", "phone", "unic"] }
-sqlx = { version = "0.6", features = ["runtime-tokio-native-tls", "postgres", "chrono"] }
-md5 = "0.7"
-lazy_static = "1.4"
-jsonwebtoken = "8.2"
-async_once = "0.2"
-tower = { version = "0.4", features = ["full"] }
+sqlx = { version = "0.6.2", features = ["runtime-tokio-native-tls", "postgres", "chrono"] }
+md5 = "0.7.0"
+lazy_static = "1.4.0"
+jsonwebtoken = "8.2.0"
+async_once = "0.2.6"
+tower = { version = "0.4.13", features = ["full"] }
 casbin = { version = "2.0.9", features = ["incremental", "cached"] }
 futures = "0.3.26"
 bytes = "1.4.0"

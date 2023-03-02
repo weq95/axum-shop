@@ -6,8 +6,8 @@ use serde_json::json;
 use sqlx::{Executor, Row};
 
 use common::error::ApiResult;
-use common::Paginate;
 use common::products::ReqQueryProduct;
+use common::Paginate;
 
 use crate::models::product_skus::ProductSkuModel;
 
@@ -50,14 +50,13 @@ impl ProductModel {
         dbg!(id);
         return Ok(0u64);
 
-       /* ProductSkuModel::delete_product_sku(id, &mut transaction).await?;
+        /* ProductSkuModel::delete_product_sku(id, &mut transaction).await?;
         if false == ProductSkuModel::add_product_sku(&product.skus, &mut transaction).await? {
             return Ok(0u64);
         }
         //添加sku
         transaction.commit().await?;
         Ok(id as u64)*/
-
     }
 
     pub async fn get(product_id: u64) -> ApiResult<Self> {

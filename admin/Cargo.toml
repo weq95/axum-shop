@@ -9,21 +9,21 @@ edition = "2021"
 common = { path = "../common" }
 tokio = { version = "1.22.5", features = ["full"] }
 axum = { version = "0.6.6", features = ["multipart", "ws", "headers"] }
-serde_json = { version = "1.0" }
-serde = { version = "1.0", features = ["derive"] }
-chrono = "0.4"
-jsonwebtoken = "8.2"
-log = "0.4"
+serde_json = { version = "1.0.93" }
+serde = { version = "1.0.152", features = ["derive"] }
+chrono = "0.4.23"
+jsonwebtoken = "8.2.0"
+log = "0.4.17"
 #fast_log = { version = "1.5", features = ["zip", "gzip"] }
 #tracing_subscriber = { version = "0.3", default-features = false, features = ["alloc"] }
 #tracing = "0.1"
-percent-encoding = "2.2"
-sqlx = { version = "0.6", features = ["runtime-tokio-native-tls", "postgres"] }
-tracing = "0.1"
-tracing-subscriber = { version = "0.3" }
-validator = { version = "0.15", features = ["derive", "phone"] }
-lazy_static = "1.4"
-async_once = "0.2"
+percent-encoding = "2.2.0"
+sqlx = { version = "0.6.2", features = ["runtime-tokio-native-tls", "postgres"] }
+tracing = "0.1.37"
+tracing-subscriber = { version = "0.3.16" }
+validator = { version = "0.15.0", features = ["derive", "phone"] }
+lazy_static = "1.4.0"
+async_once = "0.2.6"
 tower = { version = "0.4.13", features = ["full"] }
 casbin = { version = "2.0.9", features = ["incremental", "cached"] }
 futures = "0.3.26"
