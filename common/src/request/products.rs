@@ -18,7 +18,7 @@ pub struct ReqProduct {
     #[validate(length(min = 3, max = 100), custom = "unique_title")]
     pub title: Option<String>,
     #[validate(required)]
-    pub image: Option<Json<String>>,
+    pub image: Option<Json<Vec<String>>>,
     #[validate(required)]
     pub description: Option<String>,
     #[validate(required)]

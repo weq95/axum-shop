@@ -16,7 +16,7 @@ pub struct ProductModel {
     pub id: i64,
     pub title: String,
     pub description: String,
-    pub image: Json<String>,
+    pub image: Json<Vec<String>>,
     pub on_sale: bool,
     pub rating: i64,
     pub sold_count: i64,
@@ -41,7 +41,7 @@ impl ProductModel {
         )
             .bind(&product.title.clone())
             .bind(&product.description.clone())
-            .bind(&json!(product.image.clone()))
+            .bind(product.image.clone())
             .bind(&product.on_sale.clone())
             .bind(product_sku.price)
             .fetch_one(&mut tx)
@@ -69,7 +69,7 @@ impl ProductModel {
                 id: row.get::<i64, _>("id"),
                 title: row.get("title"),
                 description: row.get("description"),
-                image: Json::default(),
+                image: row.get::<Json<Vec<String>>, _>("image"),
                 on_sale: row.get::<bool, _>("on_sale"),
                 rating: row.get::<i64, _>("rating"),
                 sold_count: row.get::<i64, _>("sold_count"),
