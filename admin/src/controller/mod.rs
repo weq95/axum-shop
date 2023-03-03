@@ -3,9 +3,7 @@ use std::collections::HashMap;
 use axum::body::Body;
 use axum::extract::{Multipart, Path, Query};
 use axum::response::IntoResponse;
-use axum::Json;
 use http::StatusCode;
-use random::Source;
 use serde_json::json;
 use tokio::io::AsyncWriteExt;
 
@@ -18,6 +16,13 @@ pub mod auth;
 pub mod product_skus;
 pub mod products;
 pub mod user;
+
+/// 获取系统配置
+pub async fn get_application() -> impl IntoResponse {
+    let result = common::application_config().await;
+
+    ApiResponse::response(Some(json!({ "application": result }))).json()
+}
 
 /// 文件上传
 pub async fn upload_file(multipart: Multipart) -> impl IntoResponse {

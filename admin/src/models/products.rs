@@ -1,13 +1,10 @@
-use std::collections::HashMap;
-
 use serde::{Deserialize, Serialize};
-use serde_json::json;
-use sqlx::{Executor, Row};
 use sqlx::types::Json;
+use sqlx::{Executor, Row};
 
 use common::error::{ApiError, ApiResult};
-use common::Paginate;
 use common::products::ReqQueryProduct;
+use common::Paginate;
 
 use crate::models::product_skus::ProductSkuModel;
 
@@ -64,8 +61,8 @@ impl ProductModel {
         let mut result: ProductModel = sqlx::query("select * from products where id = $1")
             .bind(product_id)
             .fetch_optional(common::pgsql::db().await)
-            .await?.map(|row| {
-            ProductModel {
+            .await?
+            .map(|row| ProductModel {
                 id: row.get::<i64, _>("id"),
                 title: row.get("title"),
                 description: row.get("description"),
@@ -76,8 +73,8 @@ impl ProductModel {
                 review_count: row.get::<i32, _>("review_count"),
                 price: row.get::<f64, _>("sku_price"),
                 skus: Vec::default(),
-            }
-        }).ok_or(ApiError::Error("NotFound".to_string()))?;
+            })
+            .ok_or(ApiError::Error("NotFound".to_string()))?;
 
         result.skus().await?;
 

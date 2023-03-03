@@ -13,7 +13,6 @@ pub struct ProductSkuModel {
     pub product_id: i64,
 }
 
-
 impl ProductSkuModel {
     pub async fn get(id: i64) -> ApiResult<Self> {
         let result: Self = sqlx::query_as("select * from product_skus where id = $1")

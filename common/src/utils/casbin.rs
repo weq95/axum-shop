@@ -180,7 +180,7 @@ where
 }
 
 pub async fn casbin_layer() -> CasbinLayer {
-    let model = DefaultModel::from_file(PathBuf::from("./config/rbac_domains.conf"))
+    let model = DefaultModel::from_file(PathBuf::from("./rbac_domains.conf"))
         .await
         .unwrap();
 

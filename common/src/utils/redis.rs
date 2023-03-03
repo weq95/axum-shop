@@ -11,11 +11,17 @@ use crate::error::{ApiError, ApiResult};
 lazy_static! {
    pub static ref REDIS_CLIENT: AsyncOnce<Pool<RedisConnectionManager>> = AsyncOnce::new(async {
         // redis|rediss://[[<username>]:<password>@]<host>[:<port>][/<database>]
-        let dns = dotenv::var("REDIS_URL").unwrap();
-        let size: u32 = dotenv::var("REDIS_POOL_SIZE").unwrap().parse().unwrap();
+
+        let cfg = &crate::application_config().await.redis;
+        let dns = format!("redis://{}:{}@{}:{}/{}",
+        cfg.username.clone(),
+        cfg.password.clone(),
+        cfg.host.clone(),
+        cfg.port,
+        cfg.db);
 
        let manager = RedisConnectionManager::new(dns).unwrap();
-       r2d2::Pool::builder().max_size(size).build(manager).unwrap()
+       r2d2::Pool::builder().max_size(cfg.pool_size).build(manager).unwrap()
     });
 }
 

@@ -11,10 +11,18 @@ pub type ConnPool = sqlx::PgPool;
 
 lazy_static! {
     static ref PG_SQL: AsyncOnce<Arc<ConnPool>> = AsyncOnce::new(async {
-        let dns: String = dotenv::var("DBTABASE_URL").unwrap();
-        let size: u32 = dotenv::var("DBTABASE_POOL_SIZE").unwrap().parse().unwrap();
+        let cfg = &crate::application_config().await.postgres;
+        let dns: String = format!(
+            "postgres://{}:{}@{}:{}/{}",
+            cfg.username.clone(),
+            cfg.password.clone(),
+            cfg.host.clone(),
+            cfg.port,
+            cfg.db_name.clone()
+        );
+
         let conn_pool = PgPoolOptions::new()
-            .max_connections(size)
+            .max_connections(cfg.pool_size)
             .connect(&dns)
             .await
             .unwrap();

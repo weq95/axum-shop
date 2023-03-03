@@ -153,6 +153,12 @@ impl From<MultipartError> for ApiError {
     }
 }
 
+impl From<serde_yaml::Error> for ApiError {
+    fn from(value: serde_yaml::Error) -> Self {
+        ApiError::Error(value.to_string())
+    }
+}
+
 struct ApiVisitor;
 
 impl<'de> Visitor<'de> for ApiVisitor {
