@@ -15,19 +15,6 @@ pub fn add(left: usize, right: usize) -> usize {
     left + right
 }
 
-#[derive(Serialize)]
-pub struct Paginate<T: Serialize> {
-    pub page: u32,
-    /// 每页条数
-    pub page_size: u32,
-    /// 总页数
-    pub page_total: u64,
-    /// 总记录数
-    pub record_total: u64,
-    /// 返回数据: 一定要可以序列化
-    pub data: Vec<T>,
-}
-
 /// 检测是否为null
 pub trait IsEmpty {
     fn is_empty(&self) -> bool;

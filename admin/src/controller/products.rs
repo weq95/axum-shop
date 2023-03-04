@@ -1,3 +1,5 @@
+use std::ops::Deref;
+
 use axum::extract::{Path, Query};
 use axum::response::IntoResponse;
 use axum::Json;
@@ -5,7 +7,7 @@ use serde_json::json;
 use validator::Validate;
 
 use common::products::{ReqProduct, ReqQueryProduct};
-use common::ApiResponse;
+use common::{ApiResponse, Pagination};
 
 use crate::models::product_skus::ProductSkuModel;
 use crate::models::products::ProductModel;
@@ -16,7 +18,16 @@ impl ProductController {
     /// 商品列表
     pub async fn products(Query(payload): Query<ReqQueryProduct>) -> impl IntoResponse {
         match ProductModel::products(payload).await {
-            Ok(request) => ApiResponse::response(Some(request)).json(),
+            Ok((count, result)) => {
+                let mut result = Pagination::new(result);
+
+                result
+                    .set_total(count as usize)
+                    .set_per_page(15)
+                    .set_current_page(1);
+
+                ApiResponse::response(Some(result)).json()
+            }
             Err(e) => ApiResponse::fail_msg(e.to_string()).json(),
         }
     }
@@ -95,6 +106,7 @@ impl ProductController {
         }
 
         let result = ProductModel::update(ProductModel {
+            id: payload.id.unwrap() as i64,
             title: payload.title.clone().unwrap(),
             description: payload.description.clone().unwrap(),
             image: payload.image.clone().unwrap(),

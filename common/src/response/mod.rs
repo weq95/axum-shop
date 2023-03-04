@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 use std::fmt::Debug;
+use std::ops::{Deref, DerefMut};
 
 use axum::response::IntoResponse;
 use axum::{body::Body, response::Response};
@@ -110,7 +111,7 @@ pub struct SchoolJson {
 }
 
 /// 通用分页结构
-#[derive(Serialize)]
+#[derive(Serialize, Clone)]
 pub struct Pagination<T> {
     data: Vec<T>,
     // 总条数
@@ -119,6 +120,20 @@ pub struct Pagination<T> {
     per_page: usize,
     // 当前页
     current_page: usize,
+}
+
+impl<T> Deref for Pagination<T> {
+    type Target = T;
+
+    fn deref(&self) -> &Self::Target {
+        &self
+    }
+}
+
+impl<T> DerefMut for Pagination<T> {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        self
+    }
 }
 
 impl<T> Pagination<T> {
@@ -145,6 +160,12 @@ impl<T> Pagination<T> {
         self
     }
 
+    /// 设置当前页
+    pub fn set_current_page(&mut self, current_page: usize) -> &mut Pagination<T> {
+        self.current_page = current_page;
+
+        self
+    }
     /// 计算总页数
     pub fn total_pages(&mut self) -> usize {
         if self.total % self.per_page == 0 {

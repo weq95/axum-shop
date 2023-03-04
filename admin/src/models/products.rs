@@ -1,10 +1,9 @@
 use serde::{Deserialize, Serialize};
 use sqlx::types::Json;
-use sqlx::{Executor, Row};
+use sqlx::{query, Arguments, Executor, Row};
 
 use common::error::{ApiError, ApiResult};
 use common::products::ReqQueryProduct;
-use common::Paginate;
 
 use crate::models::product_skus::ProductSkuModel;
 
@@ -76,24 +75,116 @@ impl ProductModel {
             })
             .ok_or(ApiError::Error("NotFound".to_string()))?;
 
-        result.skus().await?;
+        result.image_preview_url().await.skus().await?;
 
         Ok(result)
     }
 
     /// 列表
-    pub async fn products(payload: ReqQueryProduct) -> ApiResult<Paginate<ProductModel>> {
-        todo!()
+    pub async fn products(payload: ReqQueryProduct) -> ApiResult<(u64, Vec<ProductModel>)> {
+        let mut sql_str = "select * from products where 1=1 ".to_string();
+        let mut count_str = "select count(*) as count from products where 1=1 ".to_string();
+
+        if let Some(title) = &payload.title {
+            let str = format!(r#" and title::text like '{}%' "#, title);
+            sql_str.push_str(&str);
+            count_str.push_str(&str);
+        }
+
+        let page_size = payload.page_size.unwrap_or(15);
+        let per_page = page_size * (payload.page_num.unwrap_or(1) - 1);
+
+        sql_str.push_str(&format!(" limit {} offset {}", page_size, per_page));
+
+        let mut result: Vec<Self> = sqlx::query(&*sql_str)
+            .fetch_all(common::pgsql::db().await)
+            .await?
+            .into_iter()
+            .map(|row| ProductModel {
+                id: row.get::<i64, _>("id"),
+                title: row.get("title"),
+                description: row.get("description"),
+                image: row.get::<Json<Vec<String>>, _>("image"),
+                on_sale: row.get::<bool, _>("on_sale"),
+                rating: row.get::<i64, _>("rating"),
+                sold_count: row.get::<i64, _>("sold_count"),
+                review_count: row.get::<i32, _>("review_count"),
+                price: row.get::<f64, _>("sku_price"),
+                skus: Vec::default(),
+            })
+            .collect::<Vec<Self>>();
+
+        for product in result.iter_mut() {
+            product.image_preview_url().await.skus().await?
+        }
+        let count = sqlx::query(&*count_str)
+            .fetch_one(common::pgsql::db().await)
+            .await?
+            .get::<i64, _>("count");
+
+        Ok((count as u64, result))
     }
 
     /// 更新
     pub async fn update(product: Self) -> ApiResult<bool> {
-        todo!()
+        let count =
+            sqlx::query("select count(*) as count from products where title = $1 and id != $2")
+                .bind(product.title.clone())
+                .bind(product.id)
+                .fetch_one(common::pgsql::db().await)
+                .await?
+                .get::<i64, _>("count");
+        if count > 0 {
+            return Err(ApiError::Error("修改失败，商品名称重复".to_string()));
+        }
+
+        let product_sku = product
+            .skus
+            .iter()
+            .min_by(|a, b| a.price.partial_cmp(&b.price).unwrap())
+            .unwrap();
+        let mut tx = common::pgsql::db().await.begin().await?;
+        ProductSkuModel::delete_product_sku(product.id, &mut tx).await?;
+        let row_bool = sqlx::query("update products set title = $1, description = $2, image = $3, on_sale = $4, sku_price = $5 where id = $6")
+            .bind(product.title.clone())
+            .bind(product.description.clone())
+            .bind(product.image)
+            .bind(product.on_sale)
+            .bind(product_sku.price)
+            .bind(product.id)
+            .execute(&mut tx)
+            .await?.rows_affected() == 1;
+
+        if false == row_bool {
+            tx.rollback().await?;
+
+            return Err(ApiError::Error("商品信息修改失败, 请稍后重试".to_string()));
+        }
+
+        if false == ProductSkuModel::add_product_sku(product.id, &product.skus, &mut tx).await? {
+            tx.rollback().await?;
+
+            return Err(ApiError::Error("修改商品sku失败, 请稍后重试".to_string()));
+        }
+
+        tx.commit().await?;
+
+        Ok(row_bool)
     }
 
     /// 删除
     pub async fn delete(product_id: u64) -> ApiResult<bool> {
-        todo!()
+        let mut tx = common::pgsql::db().await.begin().await?;
+
+        ProductSkuModel::delete_product_sku(product_id as i64, &mut tx).await?;
+
+        let rows_num = sqlx::query("delete from products where id = $1")
+            .bind(product_id as i64)
+            .execute(&mut tx)
+            .await?
+            .rows_affected();
+
+        Ok(rows_num > 0)
     }
 
     /// 商品sku
@@ -106,5 +197,17 @@ impl ProductModel {
             }
             Err(_e) => return Err(ApiError::Error(_e.to_string())),
         }
+    }
+
+    /// 处理图片URL
+    pub async fn image_preview_url(&mut self) -> &mut ProductModel {
+        let mut image_arr: Vec<String> = Vec::new();
+        for path in self.image.0.clone() {
+            image_arr.push(common::image_preview_url(path.clone()).await.1)
+        }
+
+        self.image = Json(image_arr);
+
+        self
     }
 }
