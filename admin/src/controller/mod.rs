@@ -1,9 +1,9 @@
-use std::collections::HashMap;
+
 use std::ops::DerefMut;
 
 use axum::{
     body::Body,
-    extract::{Multipart, Path, Query},
+    extract::{Multipart, Path},
     http::Request,
     response::IntoResponse,
     Json,
@@ -64,7 +64,6 @@ impl CommController {
         match Self::upload_images(multipart).await {
             Ok(result) => {
                 if let Some((path, preview_url)) = result {
-                    let cfg = &common::application_config().await;
                     return ApiResponse::response(Some(
                         json!({ "path": path, "preview_url":preview_url }),
                     ))
@@ -103,7 +102,7 @@ impl CommController {
         let mut path: Option<(String, String)> = None;
         let root_path = common::utils::IMAGES_PATH;
         while let Some(mut field) = multipart.next_field().await? {
-            let mut content_type = field.content_type().unwrap().to_string();
+            let content_type = field.content_type().unwrap().to_string();
             tokio::fs::create_dir_all(format!("{}{}", root_path, date)).await?;
             if !&content_type.contains("image/") {
                 return Err(ApiError::Error("不允许上传此类型文件".to_string()));

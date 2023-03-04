@@ -1,22 +1,17 @@
-use std::ops::DerefMut;
 use std::sync::Arc;
 
 use axum::{
-    body::Body,
     extract::{Path, Query},
-    http::Request,
     response::IntoResponse,
     Extension, Json,
 };
 use serde_json::json;
 use validator::Validate;
 
-use common::jwt::Claims;
 use common::{
     jwt::{UserSource, UserType, JWT},
     request::user::{ReqCrateUser, ReqGetUser, ReqLogin, ReqQueryUser, ReqUpdateUser},
-    utils::redis,
-    ApiResponse, SchoolJson,
+    ApiResponse,
 };
 
 use crate::models::user::AdminModel;
