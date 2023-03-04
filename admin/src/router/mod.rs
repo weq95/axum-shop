@@ -13,7 +13,7 @@ pub async fn routers() -> Router {
             .route("/test_redis", post(CommController::test_redis))
             .route("/get_config", post(CommController::get_application))
             .route("/upload/files", post(CommController::upload_file))
-            .route("/show/image", get(CommController::show_image))
+            .route("/public/:path", get(CommController::show_image))
             .merge(admin::admin().await)
             .merge(home::home().await),
     )

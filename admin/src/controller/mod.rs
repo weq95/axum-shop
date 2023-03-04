@@ -14,7 +14,7 @@ use tokio::io::AsyncWriteExt;
 
 use common::error::{ApiError, ApiResult};
 use common::jwt::{Claims, JWT};
-use common::{redis, ApiResponse, SchoolJson};
+use common::{redis, ApiResponse, SchoolJson, IMAGES_PATH};
 pub use user::*;
 
 pub mod address;
@@ -31,8 +31,10 @@ impl CommController {
         let key = payload.get("key").unwrap().as_str().unwrap();
 
         let mut conn = redis::get_conn_manager().await;
-        let data = redis::json_get::<SchoolJson>(conn.deref_mut(), key, "*").await;
-        ApiResponse::response(Some(data)).json()
+        match redis::json_get::<SchoolJson>(conn.deref_mut(), key, "*").await {
+            Ok(data) => ApiResponse::response(Some(data)).json(),
+            Err(e) => ApiResponse::fail_msg(e.to_string()).json(),
+        }
     }
 
     /// 刷新token
@@ -59,12 +61,14 @@ impl CommController {
 
     /// 文件上传
     pub async fn upload_file(multipart: Multipart) -> impl IntoResponse {
-        let date = chrono::Local::now().format("%Y-%m").to_string();
-        let filepath = "./files/images/".to_owned() + date.as_str() + "/";
-        match Self::upload_images(filepath, multipart).await {
+        match Self::upload_images(multipart).await {
             Ok(result) => {
-                if let Some(path) = result {
-                    return ApiResponse::response(Some(json!({ "path": path }))).json();
+                if let Some((path, preview_url)) = result {
+                    let cfg = &common::application_config().await;
+                    return ApiResponse::response(Some(
+                        json!({ "path": path, "preview_url":preview_url }),
+                    ))
+                    .json();
                 }
 
                 ApiResponse::fail_msg("文件上传失败".to_string()).json()
@@ -74,23 +78,13 @@ impl CommController {
     }
 
     /// 读取图片内容
-    pub async fn show_image(Query(payload): Query<HashMap<String, String>>) -> impl IntoResponse {
-        let filepath = match payload.get("path") {
-            Some(path) => path,
-            None => {
-                return ApiResponse::<Vec<u8>>::set_content_type(None)
-                    .status(StatusCode::NOT_FOUND)
-                    .body(Body::from("文件不存在"))
-                    .unwrap()
-                    .into_response();
-            }
-        };
-
+    pub async fn show_image(Path(path): Path<String>) -> impl IntoResponse {
+        let filepath = common::utils::url_decode(path);
         let payload_arr = &filepath.split(".").collect::<Vec<&str>>();
         let ext_name = payload_arr[payload_arr.len() - 1];
         let content_type = format!("image/{}", ext_name);
 
-        match tokio::fs::read(filepath).await {
+        match tokio::fs::read(format!("{}{}", IMAGES_PATH, filepath)).await {
             Ok(content) => ApiResponse::<Vec<u8>>::set_content_type(Some(&content_type))
                 .body(Body::from(content))
                 .unwrap()
@@ -104,21 +98,21 @@ impl CommController {
     }
 
     /// 上传图片
-    async fn upload_images(
-        filepath: String,
-        mut multipart: Multipart,
-    ) -> ApiResult<Option<String>> {
-        let mut path: Option<String> = None;
+    async fn upload_images(mut multipart: Multipart) -> ApiResult<Option<(String, String)>> {
+        let date = chrono::Local::now().format("%Y-%m/").to_string();
+        let mut path: Option<(String, String)> = None;
+        let root_path = common::utils::IMAGES_PATH;
         while let Some(mut field) = multipart.next_field().await? {
             let mut content_type = field.content_type().unwrap().to_string();
-            tokio::fs::create_dir_all(filepath.clone()).await?;
+            tokio::fs::create_dir_all(format!("{}{}", root_path, date)).await?;
             if !&content_type.contains("image/") {
                 return Err(ApiError::Error("不允许上传此类型文件".to_string()));
             }
 
-            let dst = filepath.to_owned() + field.file_name().unwrap();
-            path = Some(dst.clone());
-            let mut new_file = tokio::fs::File::create(dst).await?;
+            let dst = date.to_owned() + field.file_name().unwrap();
+            path = Some(common::utils::image_preview_url(dst.clone()).await);
+
+            let mut new_file = tokio::fs::File::create(format!("{}{}", root_path, dst)).await?;
             while let Some(chunk) = field.chunk().await? {
                 new_file.write_all(&chunk).await?;
             }

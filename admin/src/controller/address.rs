@@ -1,16 +1,16 @@
 use std::collections::HashSet;
 use std::sync::Arc;
 
-use axum::{Extension, Json};
 use axum::extract::Path;
 use axum::response::IntoResponse;
+use axum::{Extension, Json};
 
-use common::ApiResponse;
 use common::request::address::ReqAddressInfo;
-use common::response::address::{ResAddress, ResAddrResult};
+use common::response::address::{ResAddrResult, ResAddress};
+use common::ApiResponse;
 
-use crate::AppState;
 use crate::models::address::{addr_result as AddrResult, get_addr_name as AddrName, UserAddress};
+use crate::AppState;
 
 pub struct AddressController;
 
@@ -31,8 +31,8 @@ impl AddressController {
             info.district,
             info.street,
         ]))
-            .await
-            .unwrap();
+        .await
+        .unwrap();
 
         ApiResponse::response(Some(ResAddress {
             id: info.id,
@@ -53,7 +53,7 @@ impl AddressController {
             contact_phone: info.contact_phone.clone(),
             last_used_at: info.last_used_at.to_string(),
         }))
-            .json()
+        .json()
     }
 
     /// 用户收获地址列表

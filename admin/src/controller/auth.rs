@@ -1,12 +1,12 @@
 use std::collections::HashSet;
 
-use axum::{Json, response::IntoResponse};
+use axum::{response::IntoResponse, Json};
 use serde_json::Value;
 use validator::Validate;
 
 use common::{
-    ApiResponse,
-    auth::{ReqRolePermissions, ReqRoleUser}, parse_field,
+    auth::{ReqRolePermissions, ReqRoleUser},
+    parse_field, ApiResponse,
 };
 
 use crate::models::auth::{AdminAuth, RolePermissions, RoleUser};
@@ -88,9 +88,9 @@ impl RolePermissionController {
                 payload.domain.unwrap().clone(),
                 rules,
             )
-                .await,
+            .await,
         ))
-            .json()
+        .json()
     }
 
     /// 给角色分配权限
@@ -120,7 +120,9 @@ impl RolePermissionController {
     }
 
     /// 删除角色
-    pub async fn delete_role_permission(Json(payload): Json<ReqRolePermissions>) -> impl IntoResponse {
+    pub async fn delete_role_permission(
+        Json(payload): Json<ReqRolePermissions>,
+    ) -> impl IntoResponse {
         match &payload.validate() {
             Err(e) => return ApiResponse::<bool>::fail_msg(e.to_string()).json(),
             Ok(_) => {}
@@ -157,4 +159,3 @@ impl RolePermissionController {
         }
     }
 }
-

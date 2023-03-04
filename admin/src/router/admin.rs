@@ -7,9 +7,7 @@ use middleware::casbin::CasbinAuthLayer;
 
 use crate::controller::products::ProductController;
 use crate::controller::{
-    address::AddressController,
-    auth::RolePermissionController,
-    AdminController, CommController,
+    address::AddressController, auth::RolePermissionController, AdminController, CommController,
 };
 use crate::middleware;
 
@@ -37,23 +35,49 @@ pub async fn admin() -> Router {
     let address = Router::new().nest(
         "/address",
         Router::new()
-            .route("/", get(AddressController::list_address).post(AddressController::create_address))
+            .route(
+                "/",
+                get(AddressController::list_address).post(AddressController::create_address),
+            )
             .route("/result/:pid", get(AddressController::addr_result))
             .route(
                 "/:id",
-                get(AddressController::get_address).put(AddressController::update_address).delete(AddressController::delete_address),
+                get(AddressController::get_address)
+                    .put(AddressController::update_address)
+                    .delete(AddressController::delete_address),
             ),
     );
     let auth = Router::new().nest(
         "/auth",
         Router::new()
-            .route("/perm_for_role", post(RolePermissionController::get_permissions_for_role))
-            .route("/perm_for_user", post(RolePermissionController::get_permissions_for_user))
-            .route("/roles_for_user", post(RolePermissionController::get_roles_for_user))
-            .route("/user_roles", post(RolePermissionController::add_user_roles))
-            .route("/role_permissions", post(RolePermissionController::add_role_permissions))
-            .route("/delete_role_permission", delete(RolePermissionController::delete_role_permission))
-            .route("/delete_user_permission", delete(RolePermissionController::delete_user_permission)),
+            .route(
+                "/perm_for_role",
+                post(RolePermissionController::get_permissions_for_role),
+            )
+            .route(
+                "/perm_for_user",
+                post(RolePermissionController::get_permissions_for_user),
+            )
+            .route(
+                "/roles_for_user",
+                post(RolePermissionController::get_roles_for_user),
+            )
+            .route(
+                "/user_roles",
+                post(RolePermissionController::add_user_roles),
+            )
+            .route(
+                "/role_permissions",
+                post(RolePermissionController::add_role_permissions),
+            )
+            .route(
+                "/delete_role_permission",
+                delete(RolePermissionController::delete_role_permission),
+            )
+            .route(
+                "/delete_user_permission",
+                delete(RolePermissionController::delete_user_permission),
+            ),
     );
     let products = Router::new().nest(
         "/products",
