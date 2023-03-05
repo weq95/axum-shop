@@ -122,20 +122,6 @@ pub struct Pagination<T> {
     current_page: usize,
 }
 
-impl<T> Deref for Pagination<T> {
-    type Target = T;
-
-    fn deref(&self) -> &Self::Target {
-        &self
-    }
-}
-
-impl<T> DerefMut for Pagination<T> {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        self
-    }
-}
-
 impl<T> Pagination<T> {
     pub fn new(result: Vec<T>) -> Self {
         Self {

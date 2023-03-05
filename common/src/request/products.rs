@@ -9,7 +9,7 @@ pub struct ReqQueryProduct {
     pub page_num: Option<i32>,
     pub page_size: Option<i32>,
     pub title: Option<String>,
-    pub condition: Option<HashMap<String, String>>,
+    pub order_by: Option<String>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Validate)]

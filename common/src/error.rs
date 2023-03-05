@@ -159,6 +159,12 @@ impl From<serde_yaml::Error> for ApiError {
     }
 }
 
+impl From<regex::Error> for ApiError {
+    fn from(value: regex::Error) -> Self {
+        ApiError::Error(value.to_string())
+    }
+}
+
 struct ApiVisitor;
 
 impl<'de> Visitor<'de> for ApiVisitor {

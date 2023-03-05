@@ -57,23 +57,24 @@ impl ProductModel {
 
     /// 商品详情
     pub async fn get(product_id: i64) -> ApiResult<Self> {
-        let mut result: ProductModel = sqlx::query("select * from products where id = $1")
-            .bind(product_id)
-            .fetch_optional(common::pgsql::db().await)
-            .await?
-            .map(|row| ProductModel {
-                id: row.get::<i64, _>("id"),
-                title: row.get("title"),
-                description: row.get("description"),
-                image: row.get::<Json<Vec<String>>, _>("image"),
-                on_sale: row.get::<bool, _>("on_sale"),
-                rating: row.get::<i64, _>("rating"),
-                sold_count: row.get::<i64, _>("sold_count"),
-                review_count: row.get::<i32, _>("review_count"),
-                price: row.get::<f64, _>("sku_price"),
-                skus: Vec::default(),
-            })
-            .ok_or(ApiError::Error("NotFound".to_string()))?;
+        let mut result: ProductModel =
+            sqlx::query("select * from products where id = $1 and on_sale = true")
+                .bind(product_id)
+                .fetch_optional(common::pgsql::db().await)
+                .await?
+                .map(|row| ProductModel {
+                    id: row.get::<i64, _>("id"),
+                    title: row.get("title"),
+                    description: row.get("description"),
+                    image: row.get::<Json<Vec<String>>, _>("image"),
+                    on_sale: row.get::<bool, _>("on_sale"),
+                    rating: row.get::<i64, _>("rating"),
+                    sold_count: row.get::<i64, _>("sold_count"),
+                    review_count: row.get::<i32, _>("review_count"),
+                    price: row.get::<f64, _>("sku_price"),
+                    skus: Vec::default(),
+                })
+                .ok_or(ApiError::Error("NotFound".to_string()))?;
 
         result.image_preview_url().await.skus().await?;
 
@@ -82,13 +83,21 @@ impl ProductModel {
 
     /// 列表
     pub async fn products(payload: ReqQueryProduct) -> ApiResult<(u64, Vec<ProductModel>)> {
-        let mut sql_str = "select * from products where 1=1 ".to_string();
-        let mut count_str = "select count(*) as count from products where 1=1 ".to_string();
+        let mut sql_str = "select * from products where on_sale=true ".to_string();
+        let mut count_str =
+            "select count(*) as count from products where on_sale=true ".to_string();
 
         if let Some(title) = &payload.title {
             let str = format!(r#" and title::text like '{}%' "#, title);
             sql_str.push_str(&str);
             count_str.push_str(&str);
+        }
+
+        if let Some(order_by) = &payload.order_by {
+            let (field, _type) = common::utils::regex_patch(r#"^(.+)_(asc|desc)$"#, &order_by)?;
+            if &field != "" && _type != "" && Self::order_by_field(&field) {
+                sql_str.push_str(&format!(" order by {} {}", field, _type));
+            }
         }
 
         let page_size = payload.page_size.unwrap_or(15);
@@ -209,5 +218,17 @@ impl ProductModel {
         self.image = Json(image_arr);
 
         self
+    }
+
+    /// 检测字段是否存在
+    fn order_by_field(field: &str) -> bool {
+        let fields: [&str; 3] = ["sku_price", "sold_count", "rating"];
+        for i in fields {
+            if i == field {
+                return true;
+            }
+        }
+
+        false
     }
 }

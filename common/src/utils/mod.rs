@@ -1,8 +1,9 @@
-use std::path::PathBuf;
-
+use regex::{CaptureMatches, Regex};
 use serde::de::DeserializeOwned;
 use serde_json::Value;
 use url::form_urlencoded::{byte_serialize, parse};
+
+use crate::error::{ApiError, ApiResult};
 
 pub mod casbin;
 pub mod jwt;
@@ -40,4 +41,19 @@ pub fn url_decode(path: String) -> String {
 pub async fn server_host() -> String {
     let cfg = crate::application_config().await;
     format!("http://{}:{}", cfg.host.clone(), cfg.port)
+}
+
+/// 正则提取字符串数据
+pub fn regex_patch(regex_str: &str, text: &str) -> ApiResult<(String, String)> {
+    let mut result = ("".to_string(), "".to_string());
+    if let Some(captures) = Regex::new(regex_str)?.captures(text) {
+        if let Some(field1) = &captures.get(1) {
+            result.0 = field1.as_str().to_string();
+        }
+        if let Some(field2) = &captures.get(2) {
+            result.1 = field2.as_str().to_string();
+        }
+    }
+
+    Ok(result)
 }

@@ -17,7 +17,7 @@ lazy_static! {
     pub static ref APP_CONFIG: AsyncOnce<RwLock<Arc<Application>>> = AsyncOnce::new(async {
         match Application::init().await {
             Ok(application) => {
-                let mut application = RwLock::new(Arc::new(application));
+                let application = RwLock::new(Arc::new(application));
                 let application_clone = application.read().await.clone();
                 tokio::spawn(async move {
                     application_clone.update().await;

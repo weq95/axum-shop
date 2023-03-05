@@ -30,3 +30,4 @@ http-body = "0.4.5"
 redis = { version = "0.22.3", features = ["tokio-comp", "json", "serde_json", "r2d2"] }
 r2d2_redis = { version = "0.14.0" }
 url = { version = "2.3.1", features = ["serde"]}
+regex = "1.7.1"
