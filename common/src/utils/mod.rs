@@ -22,6 +22,10 @@ pub fn parse_field<T: DeserializeOwned>(json: &Value, field: &str) -> Option<T> 
 
 /// url_encode 预览地址
 pub async fn image_preview_url(path: String) -> (String, String) {
+    if &path.starts_with("http://") || &path.starts_with("https://") {
+        return (path.clone(), path);
+    }
+
     let url_encode = byte_serialize(&path.as_bytes()).collect::<String>();
 
     (
