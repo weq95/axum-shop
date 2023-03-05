@@ -1,9 +1,9 @@
-use regex::{CaptureMatches, Regex};
+use regex::Regex;
 use serde::de::DeserializeOwned;
 use serde_json::Value;
 use url::form_urlencoded::{byte_serialize, parse};
 
-use crate::error::{ApiError, ApiResult};
+use crate::error::ApiResult;
 
 pub mod casbin;
 pub mod jwt;

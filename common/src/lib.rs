@@ -1,5 +1,3 @@
-use serde::{Deserialize, Serialize};
-
 pub use application::application_config;
 pub use request::*;
 pub use response::*;

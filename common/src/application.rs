@@ -1,4 +1,3 @@
-use std::cell::RefCell;
 use std::sync::Arc;
 
 use async_once::AsyncOnce;
@@ -11,7 +10,6 @@ use tokio::sync::RwLock;
 use tokio::time::Duration;
 
 use crate::error::{ApiError, ApiResult};
-use crate::ApiResponse;
 
 lazy_static! {
     pub static ref APP_CONFIG: AsyncOnce<RwLock<Arc<Application>>> = AsyncOnce::new(async {

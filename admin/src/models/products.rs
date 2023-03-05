@@ -1,9 +1,10 @@
 use serde::{Deserialize, Serialize};
 use sqlx::types::Json;
-use sqlx::{query, Arguments, Executor, Row};
+use sqlx::Row;
 
+use crate::controller::products::ReqQueryProduct;
+use crate::models::favorite_products::FavoriteProductsModel;
 use common::error::{ApiError, ApiResult};
-use common::products::ReqQueryProduct;
 
 use crate::models::product_skus::ProductSkuModel;
 
@@ -230,5 +231,16 @@ impl ProductModel {
         }
 
         false
+    }
+
+    /// 检测商品是否存在
+    pub async fn unique_title(title: &str) -> ApiResult<bool> {
+        Ok(
+            sqlx::query("select exists (select id from products where title = $1)")
+                .bind(title)
+                .fetch_one(common::pgsql::db().await)
+                .await?
+                .get::<bool, _>("exists"),
+        )
     }
 }
