@@ -1,9 +1,12 @@
 # [host] 服务域名
 host:
+
 # [port] 服务端口
 port:
+
 # [application.yaml] 配置文件重读跟新频率
-profile_update_frequency:
+profile_refresh_rate:
+
 # [postgres] 数据库配置
 postgres:
   host:

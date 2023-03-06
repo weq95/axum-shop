@@ -82,7 +82,7 @@ impl Application {
         Ok(Application {
             host: Self::analysis::<String>("host", &cfg)?,
             port: Self::analysis::<u16>("port", &cfg)?,
-            update_frequency: Self::analysis::<u16>("profile_update_frequency", &cfg)?,
+            update_frequency: Self::analysis::<u16>("profile_refresh_rate", &cfg)?,
             postgres: Self::analysis::<PostgresConfig>("postgres", &cfg)?,
             redis: Self::analysis::<RedisConfig>("redis", &cfg)?,
         })
@@ -113,8 +113,8 @@ impl Application {
                 content
             }
             Err(_e) => {
-                println!("配置文件(./{})不存在, 正在创建配置文件 ...", filename);
-                let copy_filename = "application.example.yaml";
+                println!(" ./{} 不存在, 正在创建配置文件 ...", filename);
+                let copy_filename = ".example.yaml";
                 match tokio::fs::copy(copy_filename, filename).await {
                     Ok(_) => {
                         println!("配置文件 ./{} 创建成功, 请填写配置信息!", filename);
