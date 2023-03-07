@@ -86,7 +86,12 @@ pub async fn admin() -> Router {
                 "/",
                 get(ProductController::products).post(ProductController::create),
             )
-            .route("/:id/user/:id", get(ProductController::get))
+            .route(
+                "/:id/user/:id",
+                get(ProductController::get)
+                    .post(ProductController::favorite_product)
+                    .delete(ProductController::un_favorite_product),
+            )
             .route(
                 "/:id",
                 post(ProductController::update).delete(ProductController::delete),

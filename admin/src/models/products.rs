@@ -2,10 +2,10 @@ use serde::{Deserialize, Serialize};
 use sqlx::types::Json;
 use sqlx::Row;
 
-use crate::controller::products::ReqQueryProduct;
-use crate::models::favorite_products::FavoriteProductsModel;
 use common::error::{ApiError, ApiResult};
 
+use crate::controller::products::ReqQueryProduct;
+use crate::models::favorite_products::FavoriteProductsModel;
 use crate::models::product_skus::ProductSkuModel;
 
 #[derive(Debug, Serialize, Deserialize, Default, sqlx::FromRow)]
@@ -184,6 +184,7 @@ impl ProductModel {
 
     /// 删除
     pub async fn delete(product_id: u64) -> ApiResult<bool> {
+        FavoriteProductsModel::un_favorite_product(product_id as i64).await?;
         let mut tx = common::pgsql::db().await.begin().await?;
 
         ProductSkuModel::delete_product_sku(product_id as i64, &mut tx).await?;

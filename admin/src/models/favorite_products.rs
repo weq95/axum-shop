@@ -1,11 +1,11 @@
 use std::collections::HashSet;
 
 use chrono::NaiveDateTime;
+use futures::stream::iter;
+use futures::FutureExt;
 use sqlx::Row;
 
-use common::error::ApiResult;
-
-use crate::models::products::ProductModel;
+use common::error::{ApiError, ApiResult};
 
 pub struct FavoriteProductsModel {
     pub id: i64,
@@ -31,15 +31,40 @@ impl FavoriteProductsModel {
 
     /// 收藏商品
     pub async fn favorite(user_id: i64, product_id: i64) -> ApiResult<u64> {
-        Ok(sqlx::query(
-            "insert into favorite_products (user_id, product_id, created_at) values ($1, $2, $3)",
+        let exists = sqlx::query(
+            "select exists (select id from products where id = $1 and on_sale = true)
+UNION ALL
+select exists (select id from favorite_products where user_id = $2 and product_id = $3)",
         )
+        .bind(product_id)
         .bind(user_id)
         .bind(product_id)
-        .bind(chrono::Local::now().naive_local())
-        .execute(common::pgsql::db().await)
+        .fetch_all(common::pgsql::db().await)
         .await?
-        .rows_affected())
+        .iter()
+        .map(|row| row.get::<bool, _>("exists"))
+        .collect::<Vec<bool>>();
+
+        if let Some(&product_exists) = exists.get(0) {
+            if false == product_exists {
+                return Err(ApiError::Error("收藏失败,商品不存在".to_string()));
+            }
+        }
+        if let Some(&favorite_exists) = exists.get(1) {
+            if true == favorite_exists {
+                return Err(ApiError::Error("该商品已收藏,不能重复收藏".to_string()));
+            }
+        }
+
+        Ok(sqlx::query(
+            "insert into favorite_products (user_id, product_id, created_at) values ($1, $2, $3) RETURNING id",
+        )
+            .bind(user_id)
+            .bind(product_id)
+            .bind(chrono::Local::now().naive_local())
+            .fetch_one(common::pgsql::db().await)
+            .await?
+            .get::<i64, _>("id") as u64)
     }
 
     /// 取消收藏

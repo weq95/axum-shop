@@ -9,6 +9,8 @@ use common::{
     response::user::{GetUser, ListUser},
 };
 
+use crate::models::favorite_products::FavoriteProductsModel;
+
 pub struct AdminModel {
     pub id: i64,
 }
@@ -161,6 +163,7 @@ impl AdminModel {
 
     /// delete 删除用户
     pub async fn delete(userid: u64) -> ApiResult<bool> {
+        FavoriteProductsModel::un_favorite_user(userid as i64).await?;
         let rows_num = sqlx::query("delete from users where id = $1")
             .bind(userid as i64)
             .execute(common::pgsql::db().await)

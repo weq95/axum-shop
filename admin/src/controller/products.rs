@@ -175,6 +175,28 @@ impl ProductController {
             Err(e) => ApiResponse::fail_msg(e.to_string()).json(),
         }
     }
+
+    /// 收藏商品
+    pub async fn favorite_product(
+        Path((product_id, user_id)): Path<(u64, u64)>,
+    ) -> impl IntoResponse {
+        match FavoriteProductsModel::favorite(user_id as i64, product_id as i64).await {
+            Ok(favorite_id) => {
+                ApiResponse::response(Some(json!({ "favorite_id": favorite_id }))).json()
+            }
+            Err(e) => ApiResponse::fail_msg(e.to_string()).json(),
+        }
+    }
+
+    /// 取消收藏
+    pub async fn un_favorite_product(
+        Path((product_id, user_id)): Path<(u64, u64)>,
+    ) -> impl IntoResponse {
+        match FavoriteProductsModel::un_favorite(user_id as i64, product_id as i64).await {
+            Ok(un_rows) => ApiResponse::response(Some(json!({ "un_rows": un_rows }))).json(),
+            Err(e) => ApiResponse::fail_msg(e.to_string()).json(),
+        }
+    }
 }
 
 #[derive(Deserialize, Serialize)]
