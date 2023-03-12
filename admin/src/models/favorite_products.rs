@@ -1,8 +1,6 @@
 use std::collections::HashSet;
 
 use chrono::NaiveDateTime;
-use futures::stream::iter;
-use futures::FutureExt;
 use sqlx::Row;
 
 use common::error::{ApiError, ApiResult};

@@ -6,6 +6,9 @@ use axum::{body::Body, response::Response};
 use http::response::Builder;
 use serde::{Deserialize, Serialize};
 
+use crate::parse_field;
+use crate::response::user::GetUser;
+
 pub mod address;
 pub mod user;
 
@@ -110,9 +113,10 @@ pub struct SchoolJson {
 }
 
 /// 通用分页结构
-#[derive(Serialize, Clone)]
+#[derive(Serialize, Deserialize, Clone)]
 pub struct Pagination<T> {
-    data: Vec<T>,
+    #[serde(default)]
+    data: Option<Box<Vec<T>>>,
     // 总条数
     total: usize,
     // 页大小
@@ -121,14 +125,50 @@ pub struct Pagination<T> {
     current_page: usize,
 }
 
+impl<T> Default for Pagination<T> {
+    fn default() -> Self {
+        Self {
+            data: None,
+            total: 0,
+            per_page: 15,
+            current_page: 1,
+        }
+    }
+}
+
 impl<T> Pagination<T> {
     pub fn new(result: Vec<T>) -> Self {
-        Self {
-            data: result,
-            total: 15usize,
-            per_page: 15usize,
-            current_page: 1usize,
+        Pagination {
+            data: Some(Box::new(result)),
+            ..Self::default()
         }
+    }
+
+    /// 获取请求页数参数
+    pub fn init(paging: &serde_json::Value) -> Self {
+        let mut pagination = Pagination::default();
+        if let Some(per_page) = parse_field::<String>(&paging, "per_page") {
+            match per_page.parse::<usize>() {
+                Ok(per_page) => {
+                    pagination.set_per_page(per_page);
+                }
+                Err(err) => {
+                    println!("{}", err);
+                }
+            }
+        }
+        if let Some(current_page) = parse_field::<String>(&paging, "current_page") {
+            match current_page.parse::<usize>() {
+                Ok(current_page) => {
+                    pagination.set_current_page(current_page);
+                }
+                Err(err) => {
+                    println!("{}", err);
+                }
+            }
+        }
+
+        pagination
     }
 
     /// 设置总页数
@@ -188,7 +228,24 @@ impl<T> Pagination<T> {
         None
     }
 
+    pub fn offset(&self) -> usize {
+        (self.current_page - 1) * self.per_page
+    }
+
+    pub fn limit(&self) -> usize {
+        self.per_page
+    }
+
+    /// 添加数据
+    pub fn set_data(&mut self, data: Vec<T>) {
+        self.data = Some(Box::new(data));
+    }
+
+    /// 获取数据
     pub fn get_data(&self) -> &[T] {
-        &self.data
+        if let Some(data) = &self.data {
+            return &data[..];
+        }
+        &[]
     }
 }

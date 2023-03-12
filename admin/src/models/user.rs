@@ -5,10 +5,13 @@ use common::error::ApiError;
 use common::request::user::ReqGetUser;
 use common::{
     error::ApiResult,
-    request::user::{ReqCrateUser, ReqQueryUser, ReqUpdateUser},
-    response::user::{GetUser, ListUser},
+    parse_field,
+    request::user::{ReqCrateUser, ReqUpdateUser},
+    response::user::GetUser,
+    Pagination,
 };
 
+use crate::models::cart_items::CartItems;
 use crate::models::favorite_products::FavoriteProductsModel;
 
 pub struct AdminModel {
@@ -60,13 +63,16 @@ impl AdminModel {
     }
 
     /// list 用户列表
-    pub async fn lists(info: ReqQueryUser) -> ApiResult<ListUser> {
+    pub async fn lists(
+        pagination: &mut Pagination<GetUser>,
+        params: &serde_json::Value,
+    ) -> ApiResult<()> {
         let mut sql_str = sqlx::QueryBuilder::new(
             "select id,name,age,nickname,phone,email from users where 1=1 ",
         );
         let mut count_str =
             sqlx::QueryBuilder::new("select count(*) as total from users where 1=1 ");
-        if let Some(email) = info.email {
+        if let Some(email) = parse_field::<String>(&params, "email") {
             sql_str
                 .push(" and email like ")
                 .push_bind(format!("%{}%", &email));
@@ -74,7 +80,7 @@ impl AdminModel {
                 .push(" and email like ")
                 .push_bind(format!("%{}%", &email));
         }
-        if let Some(name) = info.name {
+        if let Some(name) = parse_field::<String>(&params, "name") {
             sql_str
                 .push(" and name like ")
                 .push_bind(format!("%{}%", &name));
@@ -82,7 +88,7 @@ impl AdminModel {
                 .push(" and name like ")
                 .push_bind(format!("%{}%", &name));
         }
-        if let Some(phone) = info.phone {
+        if let Some(phone) = parse_field::<String>(&params, "phone") {
             sql_str
                 .push(" and phone like ")
                 .push_bind(format!("{}%", &phone));
@@ -90,7 +96,7 @@ impl AdminModel {
                 .push(" and phone like ")
                 .push_bind(format!("{}%", &phone));
         }
-        if let Some(nickname) = info.nickname {
+        if let Some(nickname) = parse_field::<String>(&params, "nickname") {
             sql_str
                 .push(" and nickname like ")
                 .push_bind(format!("%{}%", &nickname));
@@ -99,24 +105,19 @@ impl AdminModel {
                 .push_bind(format!("%{}%", &nickname));
         }
 
-        let page_size = info.page_size.unwrap_or(15u32);
-        let page_num = page_size * (info.page_num.unwrap_or(1u32) - 1);
-
+        let count = count_str
+            .build()
+            .fetch_one(common::pgsql::db().await)
+            .await?
+            .get::<i64, &str>("total") as usize;
+        pagination.set_total(count);
         sql_str.push(format!(
             " order by id desc limit {} offset {}",
-            page_size, page_num
+            pagination.limit(),
+            pagination.offset()
         ));
 
-        let mut data = ListUser {
-            users: Vec::with_capacity(page_size as usize),
-            total: count_str
-                .build()
-                .fetch_one(common::pgsql::db().await)
-                .await?
-                .get::<i64, &str>("total") as u64,
-        };
-
-        data.users = sql_str
+        let data = sql_str
             .build()
             .fetch_all(common::pgsql::db().await)
             .await?
@@ -131,7 +132,8 @@ impl AdminModel {
             })
             .collect::<Vec<GetUser>>();
 
-        Ok(data)
+        pagination.set_data(data);
+        Ok(())
     }
 
     /// create 创建用户
@@ -171,5 +173,26 @@ impl AdminModel {
             .rows_affected();
 
         Ok(rows_num > 0)
+    }
+
+    // 购物车
+    pub async fn cart_items(&self, pagination: &mut Pagination<CartItems>) -> ApiResult<()> {
+        let count = sqlx::query("select count(*) as count from cart_items where user_id = $1")
+            .bind(self.id)
+            .fetch_one(common::pgsql::db().await)
+            .await?
+            .get::<i64, _>("count") as usize;
+        pagination.set_total(count).total_pages();
+
+        let cart_items: Vec<CartItems> =
+            sqlx::query_as("select * from cart_items where user_id = $1 order by created_at desc offset $2 limit $3")
+                .bind(self.id)
+                .bind(pagination.offset() as i64)
+                .bind(pagination.limit() as i64)
+                .fetch_all(common::pgsql::db().await)
+                .await?;
+
+        pagination.set_data(cart_items);
+        Ok(())
     }
 }

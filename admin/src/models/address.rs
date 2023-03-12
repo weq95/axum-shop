@@ -119,6 +119,12 @@ impl UserAddress {
     pub async fn update(id: i64, userid: i64, info: ReqAddressInfo) -> ApiResult<bool> {
         info.validate()?;
 
+        let id = sqlx::query("insert into from users")
+            .bind("123")
+            .bind("234")
+            .fetch_one(common::pgsql::db().await)
+            .await?
+            .get::<i64, _>("id");
         let rows_num = sqlx::query("update user_address set province=$1,city=$2,district=$3,street=$4,\
     address=$5,zip=$6,contact_name=$7,contact_phone=$8,updated_at=$9 where id = $10 and user_id = $11")
             .bind(info.province)

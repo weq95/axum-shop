@@ -10,8 +10,8 @@ common = { path = "../common" }
 tokio = { version = "1.22.5", features = ["full"] }
 axum = { version = "0.6.6", features = ["multipart", "ws", "headers"] }
 serde_json = { version = "1.0.93" }
-serde = { version = "1.0.152", features = ["derive"] }
-chrono = "0.4.23"
+serde = { version = "1.0.152", features = ["derive", "serde_derive"] }
+chrono = { version = "0.4.23", features = ["serde"] }
 jsonwebtoken = "8.2.0"
 log = "0.4.17"
 #fast_log = { version = "1.5", features = ["zip", "gzip"] }

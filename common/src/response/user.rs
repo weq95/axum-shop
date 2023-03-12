@@ -9,9 +9,3 @@ pub struct GetUser {
     pub phone: String,
     pub email: String,
 }
-
-#[derive(Debug, Deserialize, Serialize, Clone)]
-pub struct ListUser {
-    pub users: Vec<GetUser>,
-    pub total: u64,
-}

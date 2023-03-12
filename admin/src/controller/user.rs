@@ -8,10 +8,11 @@ use axum::{
 use serde_json::json;
 use validator::Validate;
 
+use common::response::user::GetUser;
 use common::{
     jwt::{UserSource, UserType, JWT},
-    request::user::{ReqCrateUser, ReqGetUser, ReqLogin, ReqQueryUser, ReqUpdateUser},
-    ApiResponse,
+    request::user::{ReqCrateUser, ReqGetUser, ReqLogin, ReqUpdateUser},
+    ApiResponse, Pagination,
 };
 
 use crate::models::user::AdminModel;
@@ -127,10 +128,12 @@ impl AdminController {
     }
 
     /// 用户列表
-    pub async fn lists(
-        Extension(_state): Extension<Arc<AppState>>,
-        Query(parma): Query<ReqQueryUser>,
-    ) -> impl IntoResponse {
-        ApiResponse::response(Some(AdminModel::lists(parma).await)).json()
+    pub async fn lists(Query(params): Query<serde_json::Value>) -> impl IntoResponse {
+        let mut pagination: Pagination<GetUser> = Pagination::init(&params);
+
+        match AdminModel::lists(&mut pagination, &params).await {
+            Ok(()) => ApiResponse::response(Some(pagination)).json(),
+            Err(err) => ApiResponse::fail_msg(err.to_string()).json(),
+        }
     }
 }

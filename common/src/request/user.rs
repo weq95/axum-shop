@@ -1,17 +1,6 @@
 use serde::Deserialize;
 use validator::Validate;
 
-/// 用户列表查询条件
-#[derive(Deserialize, Clone)]
-pub struct ReqQueryUser {
-    pub name: Option<String>,
-    pub nickname: Option<String>,
-    pub email: Option<String>,
-    pub phone: Option<String>,
-    pub page_num: Option<u32>,
-    pub page_size: Option<u32>,
-}
-
 /// 获取单个用户查询条件
 #[derive(Validate, Deserialize, Clone)]
 pub struct ReqGetUser {
