@@ -200,14 +200,24 @@ impl ProductModel {
 
     /// 商品sku
     pub async fn skus(&mut self) -> ApiResult<()> {
-        match ProductSkuModel::skus(self.id).await {
-            Ok(values) => {
-                self.skus = values;
-
-                Ok(())
+        let skus = ProductSkuModel::skus(vec![self.id]).await?;
+        if let Some(values) = skus.get(&self.id) {
+            for item in values {
+                self.skus.push(ProductSkuModel {
+                    id: item.id,
+                    title: item.title.clone(),
+                    description: item.description.clone(),
+                    price: item.price,
+                    stock: item.stock,
+                    product_id: item.product_id,
+                })
             }
-            Err(_e) => return Err(ApiError::Error(_e.to_string())),
+
+            return Ok(());
         }
+
+        self.skus = Vec::new();
+        Ok(())
     }
 
     /// 处理图片URL

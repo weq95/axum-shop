@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::sync::Arc;
 
 use axum::{
@@ -12,9 +13,10 @@ use common::response::user::GetUser;
 use common::{
     jwt::{UserSource, UserType, JWT},
     request::user::{ReqCrateUser, ReqGetUser, ReqLogin, ReqUpdateUser},
-    ApiResponse, Pagination,
+    ApiResponse, AppExtractor, Pagination,
 };
 
+use crate::models::cart_items::CartItemsModel;
 use crate::models::user::AdminModel;
 use crate::AppState;
 
@@ -132,6 +134,48 @@ impl AdminController {
         let mut pagination: Pagination<GetUser> = Pagination::init(&params);
 
         match AdminModel::lists(&mut pagination, &params).await {
+            Ok(()) => ApiResponse::response(Some(pagination)).json(),
+            Err(err) => ApiResponse::fail_msg(err.to_string()).json(),
+        }
+    }
+
+    /// 加入购物车
+    pub async fn add_cart(params: AppExtractor<HashMap<String, i64>>) -> impl IntoResponse {
+        let product_id = match params.inner.get("product_id") {
+            Some(&product_id) => product_id,
+            None => return ApiResponse::fail_msg("添加失败,参数错误01".to_string()).json(),
+        };
+        let sku_id = match params.inner.get("product_sku_id") {
+            Some(product_sku_id) => product_sku_id.clone(),
+            None => return ApiResponse::fail_msg("添加失败,参数错误02".to_string()).json(),
+        };
+
+        match CartItemsModel::add(params.claims.id, product_id, sku_id, 1).await {
+            Ok(cart_id) => ApiResponse::response(Some(json!({ "id": cart_id }))).json(),
+            Err(err) => ApiResponse::fail_msg(err.to_string()).json(),
+        }
+    }
+
+    /// 删除购物车商品
+    pub async fn delete_carts(
+        params: AppExtractor<HashMap<String, Vec<i64>>>,
+    ) -> impl IntoResponse {
+        let ids = match params.inner.get("ids") {
+            Some(ids) => ids.clone(),
+            None => return ApiResponse::fail_msg("添加失败,参数错误01".to_string()).json(),
+        };
+
+        match CartItemsModel::delete(ids).await {
+            Ok(rows) => ApiResponse::response(Some(json!({ "rows": rows }))).json(),
+            Err(err) => ApiResponse::fail_msg(err.to_string()).json(),
+        }
+    }
+
+    /// 购物车列表
+    pub async fn carts(params: AppExtractor<serde_json::Value>) -> impl IntoResponse {
+        let mut pagination: Pagination<HashMap<String, serde_json::Value>> =
+            Pagination::init(&params.inner);
+        match AdminModel::cart_items(params.claims.id, &mut pagination).await {
             Ok(()) => ApiResponse::response(Some(pagination)).json(),
             Err(err) => ApiResponse::fail_msg(err.to_string()).json(),
         }

@@ -7,7 +7,6 @@ use http::response::Builder;
 use serde::{Deserialize, Serialize};
 
 use crate::parse_field;
-use crate::response::user::GetUser;
 
 pub mod address;
 pub mod user;

@@ -3,16 +3,17 @@ use std::collections::HashMap;
 use serde::{Deserialize, Serialize};
 use sqlx::Row;
 
-use common::error::ApiResult;
+use common::error::{ApiError, ApiResult};
 
 #[derive(Debug, sqlx::FromRow, Deserialize, Serialize)]
-pub struct CartItems {
+pub struct CartItemsModel {
     pub id: i64,
     pub user_id: i64,
     pub product_id: i64,
     pub product_sku_id: i64,
-    pub amount: i32,
-    pub created_at: chrono::NaiveDateTime,
+    pub amount: i16,
+    pub created_at: Option<chrono::NaiveDateTime>,
+    pub updated_at: Option<chrono::NaiveDateTime>,
 }
 
 pub enum IncrType {
@@ -20,42 +21,73 @@ pub enum IncrType {
     Reduce,
 }
 
-impl CartItems {
+impl CartItemsModel {
     // 加入购物车
-    pub async fn add(item: Self) -> ApiResult<u64> {
-        let item_id = sqlx::query("select id from cart_items where user_id = $1,product_id = $2")
-            .bind(item.user_id)
-            .bind(item.product_id)
-            .fetch_one(common::pgsql::db().await)
-            .await?
-            .get::<i64, _>("id");
-        if item_id > 0 {
-            if CartItems::update_amount(item_id, IncrType::Add, 1).await? {
-                return Ok(1);
+    pub async fn add(userid: i64, product_id: i64, sku_id: i64, amount: u16) -> ApiResult<u64> {
+        let pg_row =
+            sqlx::query("select id from cart_items where user_id = $1 and product_id = $2")
+                .bind(userid)
+                .bind(product_id)
+                .fetch_one(common::pgsql::db().await)
+                .await
+                .ok();
+
+        if let Some(item) = pg_row {
+            let item_id = item.get::<i64, _>("id");
+            if CartItemsModel::update_amount(item_id, IncrType::Add, amount).await? {
+                return Ok(item_id as u64);
             }
-            return Ok(0);
+            return Err(ApiError::Error("添加失败,请稍后重试".to_string()));
         }
 
-        Ok(sqlx::query("insert into cart_items (user_id,product_id,product_sku_id,amount,created_at) values ($1,$2,$3,$4,$5) RETURNING id")
-            .bind(item.user_id)
-            .bind(item.product_id)
-            .bind(item.product_sku_id)
-            .bind(item.amount)
-            .bind(chrono::Utc::now())
+        let detection_value = sqlx::query(
+            "SELECT EXISTS (SELECT id FROM products WHERE id = $1 AND on_sale = TRUE)
+UNION ALL
+SELECT EXISTS (SELECT id FROM product_skus WHERE id = $2)",
+        )
+        .bind(product_id)
+        .bind(sku_id)
+        .fetch_all(common::pgsql::db().await)
+        .await?
+        .iter()
+        .map(|row| row.get::<bool, _>("exists"))
+        .collect::<Vec<bool>>();
+
+        if let Some(&product_bool) = detection_value.get(0) {
+            if false == product_bool {
+                return Err(ApiError::Error("商品已下架或商品不存在".to_string()));
+            }
+        }
+        if let Some(&product_bool) = detection_value.get(1) {
+            if false == product_bool {
+                return Err(ApiError::Error("商品sku不存在".to_string()));
+            }
+        }
+
+        Ok(sqlx::query("insert into cart_items (user_id,product_id,product_sku_id,amount) values ($1,$2,$3,$4) RETURNING id")
+            .bind(userid)
+            .bind(product_id)
+            .bind(sku_id)
+            .bind(amount as i16)
             .fetch_one(common::pgsql::db().await)
             .await?.get::<i64, _>("id") as u64)
     }
 
     // 购物车数量增减
-    pub async fn update_amount(id: i64, up_type: IncrType, val: u32) -> ApiResult<bool> {
-        let amount_str = match up_type {
-            IncrType::Add => format!(" amount - {} ", val),
-            IncrType::Reduce => format!(" amount + {} ", val),
-        };
+    pub async fn update_amount(id: i64, up_type: IncrType, val: u16) -> ApiResult<bool> {
+        let mut sql_str = "update cart_items set amount = amount ".to_string();
+        match up_type {
+            IncrType::Add => {
+                sql_str.push_str(" + $1 ");
+            }
+            IncrType::Reduce => {
+                sql_str.push_str(" - $1 ");
+            }
+        }
 
         Ok(
-            sqlx::query("update cart_items set amount = $1  where amount > 0 and id = $2")
-                .bind(amount_str)
+            sqlx::query(&*(sql_str.to_owned() + " where amount > 0 and id = $2"))
+                .bind(val as i16)
                 .bind(id)
                 .execute(common::pgsql::db().await)
                 .await?
@@ -65,8 +97,8 @@ impl CartItems {
     }
 
     // 删除
-    pub async fn delete(id: i64) -> ApiResult<u64> {
-        Ok(sqlx::query("delete from cart_items where id = $1")
+    pub async fn delete(id: Vec<i64>) -> ApiResult<u64> {
+        Ok(sqlx::query("delete from cart_items where id = any($1)")
             .bind(id)
             .execute(common::pgsql::db().await)
             .await?
@@ -106,15 +138,15 @@ impl CartItems {
     pub async fn product_sku(
         user_id: i64,
         product_ids: Vec<i64>,
-    ) -> ApiResult<HashMap<i64, CartItems>> {
-        let result: Vec<CartItems> =
+    ) -> ApiResult<HashMap<i64, CartItemsModel>> {
+        let result: Vec<CartItemsModel> =
             sqlx::query_as("select * from cart_items where user_id = $1 and product_id = any($2)")
                 .bind(user_id)
                 .bind(product_ids)
                 .fetch_all(common::pgsql::db().await)
                 .await?;
 
-        let mut hash_data: HashMap<i64, CartItems> = HashMap::new();
+        let mut hash_data: HashMap<i64, CartItemsModel> = HashMap::new();
         for item in result {
             hash_data.insert(item.product_id, item);
         }

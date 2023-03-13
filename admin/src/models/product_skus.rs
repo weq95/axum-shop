@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use serde::{Deserialize, Serialize};
 use sqlx::{Postgres, QueryBuilder, Transaction};
 
@@ -23,14 +25,21 @@ impl ProductSkuModel {
         Ok(result)
     }
 
-    /// 获取某商品的全部sku
-    pub async fn skus(product_id: i64) -> ApiResult<Vec<Self>> {
-        let result: Vec<Self> = sqlx::query_as("select * from product_skus where product_id = $1")
-            .bind(product_id)
-            .fetch_all(common::pgsql::db().await)
-            .await?;
+    /// 商品sku
+    pub async fn skus(product_ids: Vec<i64>) -> ApiResult<HashMap<i64, Vec<Self>>> {
+        let result: Vec<Self> =
+            sqlx::query_as("select * from product_skus where product_id = any($1)")
+                .bind(product_ids)
+                .fetch_all(common::pgsql::db().await)
+                .await?;
 
-        Ok(result)
+        let mut data_map: HashMap<i64, Vec<Self>> = HashMap::new();
+        for sku in result {
+            let data = data_map.entry(sku.product_id).or_insert(Vec::new());
+            data.push(sku);
+        }
+
+        Ok(data_map)
     }
 
     /// 添加商品的sku

@@ -1,18 +1,21 @@
+use std::collections::HashMap;
+
 use sqlx::Row;
 use validator::Validate;
 
-use common::error::ApiError;
-use common::request::user::ReqGetUser;
 use common::{
     error::ApiResult,
+    Pagination,
     parse_field,
     request::user::{ReqCrateUser, ReqUpdateUser},
     response::user::GetUser,
-    Pagination,
 };
+use common::error::ApiError;
+use common::request::user::ReqGetUser;
 
-use crate::models::cart_items::CartItems;
+use crate::models::cart_items::CartItemsModel;
 use crate::models::favorite_products::FavoriteProductsModel;
+use crate::models::product_skus::ProductSkuModel;
 
 pub struct AdminModel {
     pub id: i64,
@@ -176,23 +179,73 @@ impl AdminModel {
     }
 
     // 购物车
-    pub async fn cart_items(&self, pagination: &mut Pagination<CartItems>) -> ApiResult<()> {
+    pub async fn cart_items(
+        user_id: i64,
+        pagination: &mut Pagination<HashMap<String, serde_json::Value>>,
+    ) -> ApiResult<()> {
         let count = sqlx::query("select count(*) as count from cart_items where user_id = $1")
-            .bind(self.id)
+            .bind(user_id)
             .fetch_one(common::pgsql::db().await)
             .await?
             .get::<i64, _>("count") as usize;
         pagination.set_total(count).total_pages();
 
-        let cart_items: Vec<CartItems> =
-            sqlx::query_as("select * from cart_items where user_id = $1 order by created_at desc offset $2 limit $3")
-                .bind(self.id)
+        let mut result: Vec<HashMap<String, serde_json::Value>> = Vec::new();
+        let product_ids: Vec<i64> =
+            sqlx::query("SELECT ci.id,ci.product_id,ci.product_sku_id,ci.amount,p.title FROM
+            (select * from cart_items where user_id = $1 order by created_at desc offset $2 limit $3 ) as ci
+LEFT JOIN products as p ON ci.product_id = p.id")
+                .bind(user_id)
                 .bind(pagination.offset() as i64)
                 .bind(pagination.limit() as i64)
                 .fetch_all(common::pgsql::db().await)
-                .await?;
+                .await?.iter().map(|row| {
+                result.push(HashMap::from([
+                    ("id".to_string(), row.get::<serde_json::Value, _>("id")),
+                    ("product_id".to_string(), row.get::<serde_json::Value, _>("product_id")),
+                    ("product_sku_id".to_string(), row.get::<serde_json::Value, _>("product_sku_id")),
+                    ("amount".to_string(), row.get::<serde_json::Value, _>("amount")),
+                    ("title".to_string(), row.get::<serde_json::Value, _>("title")),
+                ]));
 
-        pagination.set_data(cart_items);
+                row.get::<i64, _>("product_id")
+            }).collect::<Vec<i64>>();
+
+        let product_skus = ProductSkuModel::skus(product_ids).await?;
+        for (_,  &mut item) in result.iter().enumerate() {
+            let key = item.get("product_id").unwrap().as_i64().unwrap();
+
+            println!("{:?}", item);
+           /* item.insert(
+                "product_skus".to_string(),
+                serde_json::to_value(product_skus.get(&key).unwrap_or(&Vec::new()))
+                    .unwrap(),
+            );*/
+        }
+        /* for item in cart_items {
+            result.push(HashMap::from([
+                ("id".to_string(), serde_json::to_value(item.id).unwrap()),
+                (
+                    "product_id".to_string(),
+                    serde_json::to_value(item.product_id).unwrap(),
+                ),
+                (
+                    "product_sku_id".to_string(),
+                    serde_json::to_value(item.product_sku_id).unwrap(),
+                ),
+                (
+                    "amount".to_string(),
+                    serde_json::to_value(item.amount).unwrap(),
+                ),
+                (
+                    "product_skus".to_string(),
+                    serde_json::to_value(product_skus.get(&item.product_id).unwrap_or(&Vec::new()))
+                        .unwrap(),
+                ),
+            ]))
+        }*/
+
+        pagination.set_data(result);
         Ok(())
     }
 }

@@ -30,6 +30,12 @@ pub async fn admin() -> Router {
                 get(AdminController::get)
                     .put(AdminController::update)
                     .delete(AdminController::delete),
+            )
+            .route(
+                "/carts",
+                get(AdminController::carts)
+                    .post(AdminController::add_cart)
+                    .delete(AdminController::delete_carts),
             ),
     );
     let address = Router::new().nest(
