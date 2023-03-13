@@ -3,17 +3,16 @@ use std::collections::HashMap;
 use sqlx::Row;
 use validator::Validate;
 
+use common::error::ApiError;
+use common::request::user::ReqGetUser;
 use common::{
     error::ApiResult,
-    Pagination,
     parse_field,
     request::user::{ReqCrateUser, ReqUpdateUser},
     response::user::GetUser,
+    Pagination,
 };
-use common::error::ApiError;
-use common::request::user::ReqGetUser;
 
-use crate::models::cart_items::CartItemsModel;
 use crate::models::favorite_products::FavoriteProductsModel;
 use crate::models::product_skus::ProductSkuModel;
 
@@ -201,49 +200,25 @@ LEFT JOIN products as p ON ci.product_id = p.id")
                 .fetch_all(common::pgsql::db().await)
                 .await?.iter().map(|row| {
                 result.push(HashMap::from([
-                    ("id".to_string(), row.get::<serde_json::Value, _>("id")),
-                    ("product_id".to_string(), row.get::<serde_json::Value, _>("product_id")),
-                    ("product_sku_id".to_string(), row.get::<serde_json::Value, _>("product_sku_id")),
-                    ("amount".to_string(), row.get::<serde_json::Value, _>("amount")),
-                    ("title".to_string(), row.get::<serde_json::Value, _>("title")),
+                    ("id".to_string(), serde_json::to_value(row.get::<i64, _>("id")).unwrap()),
+                    ("product_id".to_string(), serde_json::to_value(row.get::<i64, _>("product_id")).unwrap()),
+                    ("product_sku_id".to_string(), serde_json::to_value(row.get::<i64, _>("product_sku_id")).unwrap()),
+                    ("amount".to_string(), serde_json::to_value(row.get::<i16, _>("amount")).unwrap()),
+                    ("title".to_string(), serde_json::to_value(row.get::<&str, _>("title")).unwrap()),
                 ]));
 
                 row.get::<i64, _>("product_id")
             }).collect::<Vec<i64>>();
 
         let product_skus = ProductSkuModel::skus(product_ids).await?;
-        for (_,  &mut item) in result.iter().enumerate() {
+        for (_, item) in result.iter_mut().enumerate() {
             let key = item.get("product_id").unwrap().as_i64().unwrap();
 
-            println!("{:?}", item);
-           /* item.insert(
+            item.insert(
                 "product_skus".to_string(),
-                serde_json::to_value(product_skus.get(&key).unwrap_or(&Vec::new()))
-                    .unwrap(),
-            );*/
+                serde_json::to_value(product_skus.get(&key).unwrap_or(&Vec::new())).unwrap(),
+            );
         }
-        /* for item in cart_items {
-            result.push(HashMap::from([
-                ("id".to_string(), serde_json::to_value(item.id).unwrap()),
-                (
-                    "product_id".to_string(),
-                    serde_json::to_value(item.product_id).unwrap(),
-                ),
-                (
-                    "product_sku_id".to_string(),
-                    serde_json::to_value(item.product_sku_id).unwrap(),
-                ),
-                (
-                    "amount".to_string(),
-                    serde_json::to_value(item.amount).unwrap(),
-                ),
-                (
-                    "product_skus".to_string(),
-                    serde_json::to_value(product_skus.get(&item.product_id).unwrap_or(&Vec::new()))
-                        .unwrap(),
-                ),
-            ]))
-        }*/
 
         pagination.set_data(result);
         Ok(())
