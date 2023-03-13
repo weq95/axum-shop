@@ -192,8 +192,8 @@ impl AdminModel {
         let mut result: Vec<HashMap<String, serde_json::Value>> = Vec::new();
         let product_ids: Vec<i64> =
             sqlx::query("SELECT ci.id,ci.product_id,ci.product_sku_id,ci.amount,p.title FROM
-            (select * from cart_items where user_id = $1 order by created_at desc offset $2 limit $3 ) as ci
-LEFT JOIN products as p ON ci.product_id = p.id")
+            (select id,product_id,product_sku_id,amount from cart_items where user_id = $1 order by created_at desc offset $2 limit $3)
+            as ci LEFT JOIN products as p ON ci.product_id = p.id")
                 .bind(user_id)
                 .bind(pagination.offset() as i64)
                 .bind(pagination.limit() as i64)
