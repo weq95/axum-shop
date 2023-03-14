@@ -1,9 +1,7 @@
 use std::collections::{HashMap, HashSet};
 
 use chrono::{DateTime, NaiveDateTime, Utc};
-use serde_json::json;
 use sqlx::postgres::PgArguments;
-use sqlx::types::{Json, JsonValue};
 use sqlx::{Arguments, Row};
 use validator::Validate;
 

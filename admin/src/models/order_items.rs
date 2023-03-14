@@ -1,12 +1,11 @@
 use std::collections::HashMap;
 
-use serde::{Deserialize, Serialize};
 use sqlx::postgres::types::PgMoney;
 use sqlx::{Postgres, Transaction};
 
 use common::error::ApiResult;
 
-#[derive(Debug, sqlx::FromRow, Deserialize, Serialize)]
+#[derive(Debug, sqlx::FromRow)]
 pub struct OrderItems {
     pub id: i64,
     pub order_id: i64,
@@ -20,7 +19,7 @@ pub struct OrderItems {
 }
 
 /// 订单详情中product_sku
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug)]
 pub struct Sku {
     id: i64,
     price: PgMoney,

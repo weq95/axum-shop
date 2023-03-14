@@ -17,38 +17,14 @@ pub struct ProductSku {
 }
 
 /// 验证订单信息
-pub(crate) struct CustomProductSku {
-    id: i64,
-    product_id: i64,
-    title: String,
-    descr: String,
-    stock: i64,
-    on_sale: bool,
-    price: PgMoney,
-}
-
-impl CustomProductSku {
-    pub fn id(&self) -> i64 {
-        self.id
-    }
-    pub fn p_id(&self) -> i64 {
-        self.id
-    }
-    pub fn stock(&self) -> i64 {
-        self.id
-    }
-    pub fn sale(&self) -> i64 {
-        self.id
-    }
-    pub fn price(&self) -> PgMoney {
-        self.price
-    }
-    pub fn title(&self) -> String {
-        self.title.clone()
-    }
-    pub fn descr(&self) -> String {
-        self.descr.clone()
-    }
+pub struct CustomProductSku {
+    pub id: i64,
+    pub product_id: i64,
+    pub title: String,
+    pub descr: String,
+    pub stock: i64,
+    pub on_sale: bool,
+    pub price: PgMoney,
 }
 
 impl ProductSku {
@@ -133,20 +109,16 @@ impl ProductSku {
             .fetch_all(common::pgsql::db().await)
             .await?
             .iter()
-            .map(|row| {
-                HashMap::from([(
-                    row.get::<i64, _>("product_id"),
-                    CustomProductSku {
-                        id: row.get::<i64, _>("id"),
-                        product_id: row.get::<i64, _>("product_id"),
-                        title: "".to_string(),
-                        descr: "".to_string(),
-                        stock: row.get::<i64, _>("stock"),
-                        on_sale: row.get::<bool, _>("id"),
-                        price: PgMoney::from(row.get::<f64, _>("stock")),
-                    },
-                )])
+            .map(|row| CustomProductSku {
+                id: row.get::<i64, _>("id"),
+                product_id: row.get::<i64, _>("product_id"),
+                title: "".to_string(),
+                descr: "".to_string(),
+                stock: row.get::<i64, _>("stock"),
+                on_sale: row.get::<bool, _>("id"),
+                price: PgMoney::from(row.get::<i64, _>("stock")),
             })
+            .map(|sku| (sku.product_id, sku))
             .collect::<HashMap<i64, CustomProductSku>>())
     }
 }

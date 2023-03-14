@@ -18,7 +18,7 @@ log = "0.4.17"
 #tracing_subscriber = { version = "0.3", default-features = false, features = ["alloc"] }
 #tracing = "0.1"
 percent-encoding = "2.2.0"
-sqlx = { version = "0.6.2", features = ["runtime-tokio-native-tls", "postgres"] }
+sqlx = { version = "0.6.2", features = ["runtime-tokio-native-tls", "postgres", "bigdecimal", "decimal"] }
 tracing = "0.1.37"
 tracing-subscriber = { version = "0.3.16" }
 validator = { version = "0.15.0", features = ["derive", "phone"] }

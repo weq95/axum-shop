@@ -1,20 +1,18 @@
 use std::collections::HashMap;
 
-use serde::{Deserialize, Serialize};
-use sqlx::postgres::types::PgMoney;
-use sqlx::Row;
-
 use common::error::{ApiError, ApiResult};
+use serde::{Deserialize, Serialize};
+use sqlx::Row;
 
 use crate::models::order_items::{OrderItems, Sku};
 
-#[derive(Debug, sqlx::FromRow, Serialize, Deserialize)]
+#[derive(Debug, sqlx::FromRow)]
 pub struct Orders {
     pub id: i64,
     pub no: String,
     pub user_id: i64,
     pub address: sqlx::types::Json<HashMap<String, serde_json::Value>>,
-    pub total_amount: PgMoney,
+    pub total_amount: sqlx::postgres::types::PgMoney,
     pub remark: String,
     pub paid_at: Option<chrono::NaiveDateTime>,
     pub pay_method: Option<PayMethod>,
@@ -31,7 +29,7 @@ pub struct Orders {
 }
 
 /// 支付方式
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug)]
 pub enum PayMethod {
     // 未支付
     Unknown = 0,
@@ -46,7 +44,7 @@ pub enum PayMethod {
 }
 
 /// 退款状态
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug)]
 pub enum RefundStatus {
     // 否(未退款)
     No = 0,
@@ -61,7 +59,7 @@ pub enum RefundStatus {
 }
 
 /// 物理状态
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug)]
 pub enum ShipStatus {
     // 处理中
     Processing = 0,
@@ -108,8 +106,8 @@ impl Orders {
     // 创建订单
     pub async fn create(
         user_id: i64,
-        address: sqlx::types::Json<HashMap<String, serde_json>>,
-        total_amount: PgMoney,
+        total_money: sqlx::postgres::types::PgMoney,
+        address: sqlx::types::Json<HashMap<String, serde_json::Value>>,
         remark: String,
         order_items: HashMap<i64, Sku>,
     ) -> ApiResult<i64> {
@@ -121,7 +119,7 @@ impl Orders {
             .bind(order_no)
             .bind(user_id)
             .bind(address)
-            .bind(total_amount)
+            .bind(total_money)
             .bind(remark)
             .fetch_one(&mut tx)
             .await?.get::<i64, _>("id");
