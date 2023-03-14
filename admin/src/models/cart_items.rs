@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use serde::{Deserialize, Serialize};
 use sqlx::Row;
@@ -152,5 +152,19 @@ SELECT EXISTS (SELECT id FROM product_skus WHERE id = $2)",
         }
 
         Ok(hash_data)
+    }
+
+    // 购物车关联的商品
+    pub async fn product_exists(user_id: i64, product_ids: Vec<i64>) -> ApiResult<HashSet<i64>> {
+        Ok(sqlx::query(
+            "SELECT product_id FROM cart_items WHERE user_id =$1 and product_id = ANY($2)",
+        )
+        .bind(user_id)
+        .bind(product_ids)
+        .fetch_all(common::pgsql::db().await)
+        .await?
+        .iter()
+        .map(|row| row.get::<i64, _>("product_id"))
+        .collect::<HashSet<i64>>())
     }
 }

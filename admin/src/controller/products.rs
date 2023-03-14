@@ -9,6 +9,7 @@ use validator::ValidationError;
 
 use common::{ApiResponse, Pagination};
 
+use crate::models::cart_items::CartItemsModel;
 use crate::models::favorite_products::FavoriteProductsModel;
 use crate::models::product_skus::ProductSkuModel;
 use crate::models::products::ProductModel;
@@ -45,6 +46,10 @@ impl ProductController {
                 Err(e) => return ApiResponse::fail_msg(e.to_string()).json(),
             };
 
+        let cart_item = match CartItemsModel::product_exists(user_id, vec![product_id]).await {
+            Ok(cart_item) => cart_item,
+            Err(err) => return ApiResponse::fail_msg(err.to_string()).json(),
+        };
         match ProductModel::get(product_id).await {
             Ok(result) => ApiResponse::response(Some(json!({
                 "id": result.id,
@@ -57,7 +62,8 @@ impl ProductController {
                 "review_count":result.review_count,
                 "price": result.price,
                 "skus": result.skus,
-                "favorite_status":favorite_product.contains(&product_id)
+                "cart_status": cart_item.contains(&product_id),
+                "favorite_status":favorite_product.contains(&product_id),
             })))
             .json(),
             Err(e) => ApiResponse::fail_msg(e.to_string()).json(),
