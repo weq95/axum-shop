@@ -5,11 +5,11 @@ use sqlx::Row;
 use common::error::{ApiError, ApiResult};
 
 use crate::controller::products::ReqQueryProduct;
-use crate::models::favorite_products::FavoriteProductsModel;
-use crate::models::product_skus::ProductSkuModel;
+use crate::models::favorite_products::FavoriteProducts;
+use crate::models::product_skus::ProductSku;
 
 #[derive(Debug, Serialize, Deserialize, Default, sqlx::FromRow)]
-pub struct ProductModel {
+pub struct Product {
     pub id: i64,
     pub title: String,
     pub description: String,
@@ -19,12 +19,12 @@ pub struct ProductModel {
     pub sold_count: i64,
     pub review_count: i32,
     pub price: f64,
-    pub skus: Vec<ProductSkuModel>,
+    pub skus: Vec<ProductSku>,
 }
 
-impl ProductModel {
+impl Product {
     /// 创建
-    pub async fn create(product: ProductModel) -> ApiResult<u64> {
+    pub async fn create(product: Product) -> ApiResult<u64> {
         let mut tx = common::pgsql::db().await.begin().await?;
 
         let product_sku = product
@@ -44,9 +44,9 @@ impl ProductModel {
             .fetch_one(&mut tx)
             .await?.get::<i64, _>("id");
 
-        ProductSkuModel::delete_product_sku(id, &mut tx).await?;
+        ProductSku::delete_product_sku(id, &mut tx).await?;
 
-        if false == ProductSkuModel::add_product_sku(id, &product.skus, &mut tx).await? {
+        if false == ProductSku::add_product_sku(id, &product.skus, &mut tx).await? {
             tx.rollback().await?;
             return Err(ApiError::Error("添加商品sku失败, 请稍后重试".to_string()));
         }
@@ -58,12 +58,12 @@ impl ProductModel {
 
     /// 商品详情
     pub async fn get(product_id: i64) -> ApiResult<Self> {
-        let mut result: ProductModel =
+        let mut result: Product =
             sqlx::query("select * from products where id = $1 and on_sale = true")
                 .bind(product_id)
                 .fetch_optional(common::pgsql::db().await)
                 .await?
-                .map(|row| ProductModel {
+                .map(|row| Product {
                     id: row.get::<i64, _>("id"),
                     title: row.get("title"),
                     description: row.get("description"),
@@ -83,7 +83,7 @@ impl ProductModel {
     }
 
     /// 列表
-    pub async fn products(payload: ReqQueryProduct) -> ApiResult<(u64, Vec<ProductModel>)> {
+    pub async fn products(payload: ReqQueryProduct) -> ApiResult<(u64, Vec<Product>)> {
         let mut sql_str = "select * from products where on_sale=true ".to_string();
         let mut count_str =
             "select count(*) as count from products where on_sale=true ".to_string();
@@ -110,7 +110,7 @@ impl ProductModel {
             .fetch_all(common::pgsql::db().await)
             .await?
             .into_iter()
-            .map(|row| ProductModel {
+            .map(|row| Product {
                 id: row.get::<i64, _>("id"),
                 title: row.get("title"),
                 description: row.get("description"),
@@ -154,7 +154,7 @@ impl ProductModel {
             .min_by(|a, b| a.price.partial_cmp(&b.price).unwrap())
             .unwrap();
         let mut tx = common::pgsql::db().await.begin().await?;
-        ProductSkuModel::delete_product_sku(product.id, &mut tx).await?;
+        ProductSku::delete_product_sku(product.id, &mut tx).await?;
         let row_bool = sqlx::query("update products set title = $1, description = $2, image = $3, on_sale = $4, sku_price = $5 where id = $6")
             .bind(product.title.clone())
             .bind(product.description.clone())
@@ -171,7 +171,7 @@ impl ProductModel {
             return Err(ApiError::Error("商品信息修改失败, 请稍后重试".to_string()));
         }
 
-        if false == ProductSkuModel::add_product_sku(product.id, &product.skus, &mut tx).await? {
+        if false == ProductSku::add_product_sku(product.id, &product.skus, &mut tx).await? {
             tx.rollback().await?;
 
             return Err(ApiError::Error("修改商品sku失败, 请稍后重试".to_string()));
@@ -184,10 +184,10 @@ impl ProductModel {
 
     /// 删除
     pub async fn delete(product_id: u64) -> ApiResult<bool> {
-        FavoriteProductsModel::un_favorite_product(product_id as i64).await?;
+        FavoriteProducts::un_favorite_product(product_id as i64).await?;
         let mut tx = common::pgsql::db().await.begin().await?;
 
-        ProductSkuModel::delete_product_sku(product_id as i64, &mut tx).await?;
+        ProductSku::delete_product_sku(product_id as i64, &mut tx).await?;
 
         let rows_num = sqlx::query("delete from products where id = $1")
             .bind(product_id as i64)
@@ -200,10 +200,10 @@ impl ProductModel {
 
     /// 商品sku
     pub async fn skus(&mut self) -> ApiResult<()> {
-        let skus = ProductSkuModel::skus(vec![self.id]).await?;
+        let skus = ProductSku::skus(vec![self.id]).await?;
         if let Some(values) = skus.get(&self.id) {
             for item in values {
-                self.skus.push(ProductSkuModel {
+                self.skus.push(ProductSku {
                     id: item.id,
                     title: item.title.clone(),
                     description: item.description.clone(),
@@ -221,7 +221,7 @@ impl ProductModel {
     }
 
     /// 处理图片URL
-    pub async fn image_preview_url(&mut self) -> &mut ProductModel {
+    pub async fn image_preview_url(&mut self) -> &mut Product {
         let mut image_arr: Vec<String> = Vec::new();
         for path in self.image.0.clone() {
             image_arr.push(common::image_preview_url(path.clone()).await.1)

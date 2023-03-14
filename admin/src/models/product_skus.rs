@@ -1,12 +1,13 @@
 use std::collections::HashMap;
 
 use serde::{Deserialize, Serialize};
-use sqlx::{Postgres, QueryBuilder, Transaction};
+use sqlx::postgres::types::PgMoney;
+use sqlx::{Arguments, Postgres, QueryBuilder, Row, Transaction};
 
 use common::error::ApiResult;
 
 #[derive(Debug, Deserialize, Serialize, Default, sqlx::FromRow)]
-pub struct ProductSkuModel {
+pub struct ProductSku {
     pub id: i64,
     pub title: String,
     pub description: String,
@@ -15,7 +16,42 @@ pub struct ProductSkuModel {
     pub product_id: i64,
 }
 
-impl ProductSkuModel {
+/// 验证订单信息
+pub(crate) struct CustomProductSku {
+    id: i64,
+    product_id: i64,
+    title: String,
+    descr: String,
+    stock: i64,
+    on_sale: bool,
+    price: PgMoney,
+}
+
+impl CustomProductSku {
+    pub fn id(&self) -> i64 {
+        self.id
+    }
+    pub fn p_id(&self) -> i64 {
+        self.id
+    }
+    pub fn stock(&self) -> i64 {
+        self.id
+    }
+    pub fn sale(&self) -> i64 {
+        self.id
+    }
+    pub fn price(&self) -> PgMoney {
+        self.price
+    }
+    pub fn title(&self) -> String {
+        self.title.clone()
+    }
+    pub fn descr(&self) -> String {
+        self.descr.clone()
+    }
+}
+
+impl ProductSku {
     pub async fn get(id: i64) -> ApiResult<Self> {
         let result: Self = sqlx::query_as("select * from product_skus where id = $1")
             .bind(id)
@@ -45,7 +81,7 @@ impl ProductSkuModel {
     /// 添加商品的sku
     pub async fn add_product_sku(
         product_id: i64,
-        skus: &Vec<ProductSkuModel>,
+        skus: &Vec<ProductSku>,
         tx: &mut Transaction<'_, Postgres>,
     ) -> ApiResult<bool> {
         let mut query_build: QueryBuilder<Postgres> = sqlx::QueryBuilder::new(
@@ -76,5 +112,41 @@ impl ProductSkuModel {
             .rows_affected();
 
         Ok(rows_num > 0)
+    }
+
+    // 获取商品信息
+    pub async fn products(ids: HashMap<i64, i64>) -> ApiResult<HashMap<i64, CustomProductSku>> {
+        let mut rows = String::new();
+        let mut idx: i32 = 1;
+        let mut arg = sqlx::postgres::PgArguments::default();
+        for (product_id, product_sku_id) in ids {
+            arg.add(product_sku_id);
+            arg.add(product_id);
+            rows.push_str(format!(" (id = ${} and product_id = ${}) OR", idx, idx + 1).as_str());
+            idx += 2;
+        }
+
+        let query_builder = format!("select sku.*,p.on_sale from ( SELECT id,product_id,stock FROM product_skus WHERE {} ) as sku \
+        left join  products as p ON sku.product_id = p.id", &rows[..(rows.len() - 3)]);
+
+        Ok(sqlx::query_with(&query_builder, arg)
+            .fetch_all(common::pgsql::db().await)
+            .await?
+            .iter()
+            .map(|row| {
+                HashMap::from([(
+                    row.get::<i64, _>("product_id"),
+                    CustomProductSku {
+                        id: row.get::<i64, _>("id"),
+                        product_id: row.get::<i64, _>("product_id"),
+                        title: "".to_string(),
+                        descr: "".to_string(),
+                        stock: row.get::<i64, _>("stock"),
+                        on_sale: row.get::<bool, _>("id"),
+                        price: PgMoney::from(row.get::<f64, _>("stock")),
+                    },
+                )])
+            })
+            .collect::<HashMap<i64, CustomProductSku>>())
     }
 }

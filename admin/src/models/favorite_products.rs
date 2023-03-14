@@ -5,14 +5,14 @@ use sqlx::Row;
 
 use common::error::{ApiError, ApiResult};
 
-pub struct FavoriteProductsModel {
+pub struct FavoriteProducts {
     pub id: i64,
     pub user_id: i64,
     pub product_id: i64,
     pub created_at: NaiveDateTime,
 }
 
-impl FavoriteProductsModel {
+impl FavoriteProducts {
     /// 商品收藏信息
     pub async fn favorite_products(user_id: i64, product_ids: Vec<i64>) -> ApiResult<HashSet<i64>> {
         Ok(sqlx::query(

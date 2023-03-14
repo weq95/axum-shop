@@ -1,7 +1,9 @@
 use std::collections::{HashMap, HashSet};
 
 use chrono::{DateTime, NaiveDateTime, Utc};
+use serde_json::json;
 use sqlx::postgres::PgArguments;
+use sqlx::types::{Json, JsonValue};
 use sqlx::{Arguments, Row};
 use validator::Validate;
 
@@ -163,6 +165,63 @@ impl UserAddress {
         .rows_affected();
 
         Ok(rows_num > 0)
+    }
+
+    // 订单收获地址
+    pub async fn harvest_addr(id: i64) -> ApiResult<HashMap<String, serde_json::Value>> {
+        let info = sqlx::query(
+            "select province,city,district,address,zip,contact_name,contact_phone where id = #1",
+        )
+        .bind(id)
+        .fetch_one(common::pgsql::db().await)
+        .await
+        .map(|row| UserAddress {
+            province: row.get::<i32, _>("province"),
+            city: row.get::<i32, _>("city"),
+            district: row.get::<i32, _>("province"),
+            address: row.get("address"),
+            zip: row.get::<i32, _>("zip"),
+            contact_name: row.get("contact_name"),
+            contact_phone: row.get("contact_phone"),
+            ..UserAddress::default()
+        })
+        .map_err(|err| ApiError::Error(err.to_string()))?;
+        let addr_map = get_addr_name(HashSet::from([
+            info.province,
+            info.city,
+            info.district,
+            info.street,
+        ]))
+        .await?;
+
+        let p_name = addr_map.get(&info.province).unwrap().name.clone();
+        let c_name = addr_map.get(&info.city).unwrap().name.clone();
+        let d_name = addr_map.get(&info.district).unwrap().name.clone();
+
+        Ok(HashMap::from([
+            (
+                "name".to_string(),
+                serde_json::to_value(&info.contact_name).unwrap(),
+            ),
+            (
+                "phone".to_string(),
+                serde_json::to_value(&info.contact_phone).unwrap(),
+            ),
+            ("zip".to_string(), serde_json::to_value(&info.zip).unwrap()),
+            (
+                "province".to_string(),
+                serde_json::to_value(p_name).unwrap(),
+            ),
+            ("city".to_string(), serde_json::to_value(c_name).unwrap()),
+            (
+                "district".to_string(),
+                serde_json::to_value(d_name).unwrap(),
+            ),
+            (
+                "address".to_string(),
+                serde_json::to_value(&info.address).unwrap(),
+            ),
+        ]))
     }
 }
 

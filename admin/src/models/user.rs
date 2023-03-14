@@ -13,14 +13,14 @@ use common::{
     Pagination,
 };
 
-use crate::models::favorite_products::FavoriteProductsModel;
-use crate::models::product_skus::ProductSkuModel;
+use crate::models::favorite_products::FavoriteProducts;
+use crate::models::product_skus::ProductSku;
 
-pub struct AdminModel {
+pub struct Admin {
     pub id: i64,
 }
 
-impl AdminModel {
+impl Admin {
     /// get 用户详情信息
     pub async fn get(info: ReqGetUser) -> ApiResult<GetUser> {
         info.validate()?;
@@ -167,7 +167,7 @@ impl AdminModel {
 
     /// delete 删除用户
     pub async fn delete(userid: u64) -> ApiResult<bool> {
-        FavoriteProductsModel::un_favorite_user(userid as i64).await?;
+        FavoriteProducts::un_favorite_user(userid as i64).await?;
         let rows_num = sqlx::query("delete from users where id = $1")
             .bind(userid as i64)
             .execute(common::pgsql::db().await)
@@ -210,7 +210,7 @@ impl AdminModel {
                 row.get::<i64, _>("product_id")
             }).collect::<Vec<i64>>();
 
-        let product_skus = ProductSkuModel::skus(product_ids).await?;
+        let product_skus = ProductSku::skus(product_ids).await?;
         for (_, item) in result.iter_mut().enumerate() {
             let key = item.get("product_id").unwrap().as_i64().unwrap();
 

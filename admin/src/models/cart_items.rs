@@ -6,7 +6,7 @@ use sqlx::Row;
 use common::error::{ApiError, ApiResult};
 
 #[derive(Debug, sqlx::FromRow, Deserialize, Serialize)]
-pub struct CartItemsModel {
+pub struct CartItems {
     pub id: i64,
     pub user_id: i64,
     pub product_id: i64,
@@ -21,7 +21,7 @@ pub enum IncrType {
     Reduce,
 }
 
-impl CartItemsModel {
+impl CartItems {
     // 加入购物车
     pub async fn add(userid: i64, product_id: i64, sku_id: i64, amount: u16) -> ApiResult<u64> {
         let pg_row =
@@ -34,7 +34,7 @@ impl CartItemsModel {
 
         if let Some(item) = pg_row {
             let item_id = item.get::<i64, _>("id");
-            if CartItemsModel::update_amount(item_id, IncrType::Add, amount).await? {
+            if CartItems::update_amount(item_id, IncrType::Add, amount).await? {
                 return Ok(item_id as u64);
             }
             return Err(ApiError::Error("添加失败,请稍后重试".to_string()));
@@ -138,15 +138,15 @@ SELECT EXISTS (SELECT id FROM product_skus WHERE id = $2)",
     pub async fn product_sku(
         user_id: i64,
         product_ids: Vec<i64>,
-    ) -> ApiResult<HashMap<i64, CartItemsModel>> {
-        let result: Vec<CartItemsModel> =
+    ) -> ApiResult<HashMap<i64, CartItems>> {
+        let result: Vec<CartItems> =
             sqlx::query_as("select * from cart_items where user_id = $1 and product_id = any($2)")
                 .bind(user_id)
                 .bind(product_ids)
                 .fetch_all(common::pgsql::db().await)
                 .await?;
 
-        let mut hash_data: HashMap<i64, CartItemsModel> = HashMap::new();
+        let mut hash_data: HashMap<i64, CartItems> = HashMap::new();
         for item in result {
             hash_data.insert(item.product_id, item);
         }

@@ -16,8 +16,8 @@ use common::{
     ApiResponse, AppExtractor, Pagination,
 };
 
-use crate::models::cart_items::CartItemsModel;
-use crate::models::user::AdminModel;
+use crate::models::cart_items::CartItems;
+use crate::models::user::Admin;
 use crate::AppState;
 
 pub struct AdminController;
@@ -36,7 +36,7 @@ impl AdminController {
         }
 
         let email = payload.email.unwrap().clone();
-        let user = AdminModel::get(ReqGetUser {
+        let user = Admin::get(ReqGetUser {
             id: None,
             name: None,
             age: None,
@@ -82,7 +82,7 @@ impl AdminController {
         Extension(_state): Extension<Arc<AppState>>,
         Json(user): Json<ReqCrateUser>,
     ) -> impl IntoResponse {
-        ApiResponse::response(Some(AdminModel::create(user).await)).json()
+        ApiResponse::response(Some(Admin::create(user).await)).json()
     }
 
     /// 用户详情
@@ -94,7 +94,7 @@ impl AdminController {
             return ApiResponse::fail_msg("参数错误".to_string()).json();
         }
 
-        let userinfo = AdminModel::get(ReqGetUser {
+        let userinfo = Admin::get(ReqGetUser {
             id: Some(userid as i64),
             name: None,
             age: None,
@@ -114,7 +114,7 @@ impl AdminController {
         Extension(_state): Extension<Arc<AppState>>,
         Json(user): Json<ReqUpdateUser>,
     ) -> impl IntoResponse {
-        ApiResponse::response(Some(AdminModel::update(user).await)).json()
+        ApiResponse::response(Some(Admin::update(user).await)).json()
     }
 
     /// 删除用户
@@ -126,14 +126,14 @@ impl AdminController {
             return ApiResponse::fail_msg("参数错误".to_string()).json();
         }
 
-        ApiResponse::response(Some(AdminModel::delete(userid).await)).json()
+        ApiResponse::response(Some(Admin::delete(userid).await)).json()
     }
 
     /// 用户列表
     pub async fn lists(Query(params): Query<serde_json::Value>) -> impl IntoResponse {
         let mut pagination: Pagination<GetUser> = Pagination::init(&params);
 
-        match AdminModel::lists(&mut pagination, &params).await {
+        match Admin::lists(&mut pagination, &params).await {
             Ok(()) => ApiResponse::response(Some(pagination)).json(),
             Err(err) => ApiResponse::fail_msg(err.to_string()).json(),
         }
@@ -150,7 +150,7 @@ impl AdminController {
             None => return ApiResponse::fail_msg("添加失败,参数错误02".to_string()).json(),
         };
 
-        match CartItemsModel::add(params.claims.id, product_id, sku_id, 1).await {
+        match CartItems::add(params.claims.id, product_id, sku_id, 1).await {
             Ok(cart_id) => ApiResponse::response(Some(json!({ "id": cart_id }))).json(),
             Err(err) => ApiResponse::fail_msg(err.to_string()).json(),
         }
@@ -165,7 +165,7 @@ impl AdminController {
             None => return ApiResponse::fail_msg("添加失败,参数错误01".to_string()).json(),
         };
 
-        match CartItemsModel::delete(ids).await {
+        match CartItems::delete(ids).await {
             Ok(rows) => ApiResponse::response(Some(json!({ "rows": rows }))).json(),
             Err(err) => ApiResponse::fail_msg(err.to_string()).json(),
         }
@@ -175,7 +175,7 @@ impl AdminController {
     pub async fn carts(params: AppExtractor<serde_json::Value>) -> impl IntoResponse {
         let mut pagination: Pagination<HashMap<String, serde_json::Value>> =
             Pagination::init(&params.inner);
-        match AdminModel::cart_items(params.claims.id, &mut pagination).await {
+        match Admin::cart_items(params.claims.id, &mut pagination).await {
             Ok(()) => ApiResponse::response(Some(pagination)).json(),
             Err(err) => ApiResponse::fail_msg(err.to_string()).json(),
         }

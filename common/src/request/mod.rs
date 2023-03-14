@@ -9,6 +9,7 @@ use crate::ApiResponse;
 
 pub mod address;
 pub mod auth;
+pub mod order;
 pub mod user;
 
 /// 存储HTTPBody数据, 当前登录用户信息

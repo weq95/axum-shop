@@ -9,17 +9,17 @@ use validator::ValidationError;
 
 use common::{ApiResponse, Pagination};
 
-use crate::models::cart_items::CartItemsModel;
-use crate::models::favorite_products::FavoriteProductsModel;
-use crate::models::product_skus::ProductSkuModel;
-use crate::models::products::ProductModel;
+use crate::models::cart_items::CartItems;
+use crate::models::favorite_products::FavoriteProducts;
+use crate::models::product_skus::ProductSku;
+use crate::models::products::Product;
 
 pub struct ProductController;
 
 impl ProductController {
     /// 商品列表
     pub async fn products(Query(payload): Query<ReqQueryProduct>) -> impl IntoResponse {
-        match ProductModel::products(payload).await {
+        match Product::products(payload).await {
             Ok((count, result)) => {
                 let mut result = Pagination::new(result);
 
@@ -41,16 +41,16 @@ impl ProductController {
         }
 
         let favorite_product =
-            match FavoriteProductsModel::favorite_products(user_id, vec![product_id]).await {
+            match FavoriteProducts::favorite_products(user_id, vec![product_id]).await {
                 Ok(values) => values,
                 Err(e) => return ApiResponse::fail_msg(e.to_string()).json(),
             };
 
-        let cart_item = match CartItemsModel::product_exists(user_id, vec![product_id]).await {
+        let cart_item = match CartItems::product_exists(user_id, vec![product_id]).await {
             Ok(cart_item) => cart_item,
             Err(err) => return ApiResponse::fail_msg(err.to_string()).json(),
         };
-        match ProductModel::get(product_id).await {
+        match Product::get(product_id).await {
             Ok(result) => ApiResponse::response(Some(json!({
                 "id": result.id,
                 "name": result.title,
@@ -77,23 +77,23 @@ impl ProductController {
             Err(e) => return ApiResponse::fail_msg(e.to_string()).json(),
         }
 
-        let mut skus: Vec<ProductSkuModel> = Vec::new();
+        let mut skus: Vec<ProductSku> = Vec::new();
         for sku in &payload.skus.unwrap() {
             match sku.validate() {
                 Ok(_) => (),
                 Err(e) => return ApiResponse::fail_msg(e.to_string()).json(),
             }
 
-            skus.push(ProductSkuModel {
+            skus.push(ProductSku {
                 title: sku.title.clone().unwrap(),
                 description: sku.description.clone().unwrap(),
                 price: sku.price.unwrap(),
                 stock: sku.stock.unwrap(),
-                ..ProductSkuModel::default()
+                ..ProductSku::default()
             })
         }
 
-        match ProductModel::unique_title(&payload.title.clone().unwrap()).await {
+        match Product::unique_title(&payload.title.clone().unwrap()).await {
             Ok(bool_val) => {
                 if bool_val {
                     return ApiResponse::fail_msg("商品已存在".to_string()).json();
@@ -104,13 +104,13 @@ impl ProductController {
             }
         }
 
-        let result = ProductModel::create(ProductModel {
+        let result = Product::create(Product {
             title: payload.title.clone().unwrap(),
             description: payload.description.clone().unwrap(),
             image: payload.image.clone().unwrap(),
             on_sale: payload.on_sale.unwrap(),
             skus,
-            ..ProductModel::default()
+            ..Product::default()
         })
         .await;
         match result {
@@ -126,30 +126,30 @@ impl ProductController {
             Err(e) => return ApiResponse::fail_msg(e.to_string()).json(),
         }
 
-        let mut skus: Vec<ProductSkuModel> = Vec::new();
+        let mut skus: Vec<ProductSku> = Vec::new();
         for sku in &payload.skus.unwrap() {
             match sku.validate() {
                 Ok(_) => (),
                 Err(e) => return ApiResponse::fail_msg(e.to_string()).json(),
             }
 
-            skus.push(ProductSkuModel {
+            skus.push(ProductSku {
                 title: sku.title.clone().unwrap(),
                 description: sku.description.clone().unwrap(),
                 price: sku.price.unwrap(),
                 stock: sku.stock.unwrap(),
-                ..ProductSkuModel::default()
+                ..ProductSku::default()
             })
         }
 
-        let result = ProductModel::update(ProductModel {
+        let result = Product::update(Product {
             id: payload.id.unwrap() as i64,
             title: payload.title.clone().unwrap(),
             description: payload.description.clone().unwrap(),
             image: payload.image.clone().unwrap(),
             on_sale: payload.on_sale.unwrap(),
             skus,
-            ..ProductModel::default()
+            ..Product::default()
         })
         .await;
         match result {
@@ -170,7 +170,7 @@ impl ProductController {
             return ApiResponse::fail_msg("没有需要删除的商品".to_string()).json();
         }
 
-        match ProductModel::delete(product_id).await {
+        match Product::delete(product_id).await {
             Ok(bool_val) => {
                 if bool_val {
                     return ApiResponse::response(Some(json!({ "status": bool_val }))).json();
@@ -186,7 +186,7 @@ impl ProductController {
     pub async fn favorite_product(
         Path((product_id, user_id)): Path<(u64, u64)>,
     ) -> impl IntoResponse {
-        match FavoriteProductsModel::favorite(user_id as i64, product_id as i64).await {
+        match FavoriteProducts::favorite(user_id as i64, product_id as i64).await {
             Ok(favorite_id) => {
                 ApiResponse::response(Some(json!({ "favorite_id": favorite_id }))).json()
             }
@@ -198,7 +198,7 @@ impl ProductController {
     pub async fn un_favorite_product(
         Path((product_id, user_id)): Path<(u64, u64)>,
     ) -> impl IntoResponse {
-        match FavoriteProductsModel::un_favorite(user_id as i64, product_id as i64).await {
+        match FavoriteProducts::un_favorite(user_id as i64, product_id as i64).await {
             Ok(un_rows) => ApiResponse::response(Some(json!({ "un_rows": un_rows }))).json(),
             Err(e) => ApiResponse::fail_msg(e.to_string()).json(),
         }
