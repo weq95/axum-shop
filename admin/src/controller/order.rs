@@ -3,7 +3,6 @@ use std::ops::Add;
 
 use axum::response::IntoResponse;
 use serde_json::json;
-use sqlx::postgres::types::PgMoney;
 use validator::{Validate, ValidationErrors};
 
 use common::order::ReqCreateOrder;
@@ -52,7 +51,7 @@ impl OrderController {
         };
 
         let mut order_items: HashMap<i64, _> = HashMap::new();
-        let mut total_money = PgMoney::from(0);
+        let mut total_money = 0i64;
         if let Some(order) = &params.inner.products {
             for (idx, item) in order.iter().enumerate() {
                 match values.get(&item.product_id.unwrap()) {
@@ -72,7 +71,7 @@ impl OrderController {
                                 .json();
                         }
 
-                        total_money.add(sku.price);
+                        total_money += sku.price;
                         order_items.insert(
                             sku.product_id,
                             OrderItems::generate_sku(

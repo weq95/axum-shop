@@ -80,8 +80,6 @@ impl UserAddress {
 
     /// 用户创建收获地址
     pub async fn create(userid: i64, info: ReqAddressInfo) -> ApiResult<i64> {
-        info.validate()?;
-
         let count =
             sqlx::query(r#"SELECT COUNT("id") AS count  FROM "user_address" WHERE user_id = $1"#)
                 .bind(userid)
@@ -117,7 +115,6 @@ impl UserAddress {
 
     /// 用户更新收获地址信息
     pub async fn update(id: i64, userid: i64, info: ReqAddressInfo) -> ApiResult<bool> {
-        info.validate()?;
         let rows_num = sqlx::query("update user_address set province=$1,city=$2,district=$3,street=$4,\
     address=$5,zip=$6,contact_name=$7,contact_phone=$8,updated_at=$9 where id = $10 and user_id = $11")
             .bind(info.province)

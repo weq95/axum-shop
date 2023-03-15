@@ -1,7 +1,6 @@
 use std::collections::HashMap;
 
 use serde::{Deserialize, Serialize};
-use sqlx::postgres::types::PgMoney;
 use sqlx::{Arguments, Postgres, QueryBuilder, Row, Transaction};
 
 use common::error::ApiResult;
@@ -24,7 +23,7 @@ pub struct CustomProductSku {
     pub descr: String,
     pub stock: i64,
     pub on_sale: bool,
-    pub price: PgMoney,
+    pub price: i64,
 }
 
 impl ProductSku {
@@ -116,7 +115,7 @@ impl ProductSku {
                 descr: "".to_string(),
                 stock: row.get::<i64, _>("stock"),
                 on_sale: row.get::<bool, _>("id"),
-                price: PgMoney::from(row.get::<i64, _>("stock")),
+                price: row.get::<i64, _>("stock"),
             })
             .map(|sku| (sku.product_id, sku))
             .collect::<HashMap<i64, CustomProductSku>>())

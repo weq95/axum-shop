@@ -1,8 +1,10 @@
 use std::collections::HashMap;
 
-use common::error::{ApiError, ApiResult};
 use serde::{Deserialize, Serialize};
+use serde_json::json;
 use sqlx::Row;
+
+use common::error::{ApiError, ApiResult};
 
 use crate::models::order_items::{OrderItems, Sku};
 
@@ -12,7 +14,7 @@ pub struct Orders {
     pub no: String,
     pub user_id: i64,
     pub address: sqlx::types::Json<HashMap<String, serde_json::Value>>,
-    pub total_amount: sqlx::postgres::types::PgMoney,
+    pub total_amount: i64,
     pub remark: String,
     pub paid_at: Option<chrono::NaiveDateTime>,
     pub pay_method: Option<PayMethod>,
@@ -106,7 +108,7 @@ impl Orders {
     // 创建订单
     pub async fn create(
         user_id: i64,
-        total_money: sqlx::postgres::types::PgMoney,
+        total_money: i64,
         address: sqlx::types::Json<HashMap<String, serde_json::Value>>,
         remark: String,
         order_items: HashMap<i64, Sku>,
@@ -118,7 +120,7 @@ impl Orders {
         )
             .bind(order_no)
             .bind(user_id)
-            .bind(address)
+            .bind(json!(address))
             .bind(total_money)
             .bind(remark)
             .fetch_one(&mut tx)

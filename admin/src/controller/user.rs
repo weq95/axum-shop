@@ -9,6 +9,7 @@ use axum::{
 use serde_json::json;
 use validator::Validate;
 
+use common::error::format_errors;
 use common::response::user::GetUser;
 use common::{
     jwt::{UserSource, UserType, JWT},
@@ -82,20 +83,27 @@ impl AdminController {
         Extension(_state): Extension<Arc<AppState>>,
         Json(user): Json<ReqCrateUser>,
     ) -> impl IntoResponse {
-        ApiResponse::response(Some(Admin::create(user).await)).json()
+        match user.validate() {
+            Ok(()) => (),
+            Err(e) => {
+                return ApiResponse::success_code_data(
+                    common::response::FAIL,
+                    Some(json!(format_errors(e))),
+                )
+                .json();
+            }
+        }
+
+        match Admin::create(user).await {
+            Ok(id) => ApiResponse::response(Some(json!({ "id": id }))).json(),
+            Err(e) => ApiResponse::fail_msg(e.to_string()).json(),
+        }
     }
 
     /// 用户详情
-    pub async fn get(
-        Extension(_state): Extension<Arc<AppState>>,
-        Path(userid): Path<u64>,
-    ) -> impl IntoResponse {
-        if userid == 0 {
-            return ApiResponse::fail_msg("参数错误".to_string()).json();
-        }
-
+    pub async fn get(params: AppExtractor<u64>) -> impl IntoResponse {
         let userinfo = Admin::get(ReqGetUser {
-            id: Some(userid as i64),
+            id: Some(params.inner as i64),
             name: None,
             age: None,
             nickname: None,

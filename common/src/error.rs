@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::convert::Infallible;
 use std::fmt::{Display, Formatter};
 use std::io::Error;
@@ -40,24 +41,28 @@ impl From<tokio::io::Error> for ApiError {
     }
 }
 
-impl From<validator::ValidationError> for ApiError {
-    fn from(_e: ValidationError) -> Self {
-        ApiError::Error(_e.to_string())
-    }
+pub fn format_error(validate_err: ValidationError) -> Vec<HashMap<String, String>> {
+    let mut errors = ValidationErrors::new();
+    errors.add("", validate_err.clone());
+    format_errors(errors)
 }
 
-impl From<ValidationErrors> for ApiError {
-    fn from(_errors: ValidationErrors) -> Self {
-        let binding = _errors.clone();
-        let err = binding.errors();
+pub fn format_errors(errors: ValidationErrors) -> Vec<HashMap<String, String>> {
+    errors
+        .field_errors()
+        .into_iter()
+        .map(|(field, err)| {
+            let message = err
+                .into_iter()
+                .map(|e| e.to_string())
+                .collect::<Vec<String>>()
+                .join(",");
 
-        for (str, err_kind) in err.into_iter() {
-            println!("{}, {:?}", &str, err_kind);
-            // data.insert(*str.to_string(), 1.to_string());
-        }
-
-        ApiError::Error(_errors.to_string())
-    }
+            let mut map_data = HashMap::new();
+            map_data.insert(field.to_owned(), message);
+            map_data
+        })
+        .collect::<Vec<HashMap<String, String>>>()
 }
 
 impl From<sqlx::Error> for ApiError {

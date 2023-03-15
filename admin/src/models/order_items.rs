@@ -1,9 +1,8 @@
 use std::collections::HashMap;
 
-use sqlx::postgres::types::PgMoney;
 use sqlx::{Postgres, Transaction};
 
-use common::error::ApiResult;
+use common::error::{ApiError, ApiResult};
 
 #[derive(Debug, sqlx::FromRow)]
 pub struct OrderItems {
@@ -22,7 +21,7 @@ pub struct OrderItems {
 #[derive(Debug)]
 pub struct Sku {
     id: i64,
-    price: PgMoney,
+    price: i64,
     amount: i16,
     title: String,
     descr: String,
@@ -34,13 +33,14 @@ impl OrderItems {
         items: HashMap<i64, Sku>,
         tx: &mut Transaction<'_, Postgres>,
     ) -> ApiResult<bool> {
+        Ok::<bool, ApiError>(true);
         todo!()
     }
 
     // 创建生成sku
     pub async fn generate_sku(
         id: i64,
-        price: PgMoney,
+        price: i64,
         amount: i16,
         title: String,
         descr: String,

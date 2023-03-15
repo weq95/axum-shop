@@ -18,7 +18,7 @@ pub use user::*;
 
 pub mod address;
 pub mod auth;
-mod order;
+pub mod order;
 pub mod products;
 pub mod user;
 

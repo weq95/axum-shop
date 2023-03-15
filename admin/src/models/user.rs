@@ -23,8 +23,6 @@ pub struct Admin {
 impl Admin {
     /// get 用户详情信息
     pub async fn get(info: ReqGetUser) -> ApiResult<GetUser> {
-        info.validate()?;
-
         let mut sql_str = sqlx::QueryBuilder::new(
             "select id,name,age,nickname,phone,email from users where 1=1 ",
         );
@@ -140,8 +138,6 @@ impl Admin {
 
     /// create 创建用户
     pub async fn create(info: ReqCrateUser) -> ApiResult<u64> {
-        info.validate()?;
-
         let phone = &info.phone.unwrap()[3..].to_string();
         let id: i64 = sqlx::query("insert into users (name, age, nickname, phone, email) values($1, $2, $3, $4, $5) RETURNING id")
             .bind(&info.name).bind(&info.age).bind(&info.nickname)

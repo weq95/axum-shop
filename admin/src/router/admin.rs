@@ -7,7 +7,8 @@ use middleware::casbin::CasbinAuthLayer;
 
 use crate::controller::products::ProductController;
 use crate::controller::{
-    address::AddressController, auth::RolePermissionController, AdminController, CommController,
+    address::AddressController, auth::RolePermissionController, order::OrderController,
+    AdminController, CommController,
 };
 use crate::middleware;
 
@@ -104,6 +105,19 @@ pub async fn admin() -> Router {
             ),
     );
 
+    let orders = Router::new().nest(
+        "/orders",
+        Router::new()
+            .route(
+                "/",
+                get(OrderController::index).post(OrderController::store),
+            )
+            .route(
+                "/:id",
+                get(OrderController::get).post(OrderController::update),
+            ),
+    );
+
     Router::new().nest(
         "/admin",
         Router::new()
@@ -112,6 +126,7 @@ pub async fn admin() -> Router {
             .merge(address)
             .merge(auth)
             .merge(products)
+            .merge(orders)
             .layer(
                 ServiceBuilder::new()
                     .layer(AxumMiddleware::from_fn(middleware::auth_guard))

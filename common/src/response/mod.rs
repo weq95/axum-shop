@@ -12,9 +12,9 @@ pub mod address;
 pub mod user;
 
 /// 全局通用成功编码
-const SUCCESS: u16 = 0;
+pub const SUCCESS: u16 = 0;
 /// 全局通用错误编码
-const FAIL: u16 = 10000;
+pub const FAIL: u16 = 10000;
 
 #[derive(Debug, Serialize)]
 pub struct ApiResponse<T: Serialize> {
