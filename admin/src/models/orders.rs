@@ -188,13 +188,13 @@ impl Orders {
         Ok(sqlx::query(
             "update order_items set updated_at = $1, address = $2 where id = $3 and user_id = $4",
         )
-            .bind(chrono::Utc::now().naive_utc())
-            .bind(addr)
-            .bind(id)
-            .bind(user_id)
-            .execute(common::postgres().await)
-            .await?
-            .rows_affected()
+        .bind(chrono::Utc::now().naive_utc())
+        .bind(addr)
+        .bind(id)
+        .bind(user_id)
+        .execute(common::postgres().await)
+        .await?
+        .rows_affected()
             > 0)
     }
 

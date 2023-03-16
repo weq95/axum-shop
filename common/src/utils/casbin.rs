@@ -27,7 +27,7 @@ use sqlx::{error::Error as SqlError, postgres::PgQueryResult, Arguments, FromRow
 use tokio::sync::RwLock;
 use tower::{Layer, Service};
 
-use crate::{error::ApiResult, ConnPool, ApiResponse};
+use crate::{error::ApiResult, ApiResponse, ConnPool};
 
 #[derive(Clone)]
 pub struct CasbinVals {

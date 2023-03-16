@@ -3,7 +3,7 @@ use std::sync::Arc;
 
 use axum::extract::Path;
 use axum::response::IntoResponse;
-use axum::{Extension, Json};
+use axum::Extension;
 use serde_json::json;
 use validator::Validate;
 
