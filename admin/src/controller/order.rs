@@ -71,7 +71,7 @@ impl OrderController {
             Err(e) => return ApiResponse::fail_msg(e.to_string()).json(),
         }
         if let Some(result) = &params.inner.products {
-            while let Some(req) = result.iter().next() {
+            for req in result {
                 match req.validate() {
                     Ok(()) => {
                         ids.insert(req.product_id.unwrap(), req.product_sku_id.unwrap());
@@ -81,7 +81,7 @@ impl OrderController {
                             common::FAIL,
                             Some(json!(format_errors(e))),
                         )
-                        .json();
+                            .json();
                     }
                 }
             }

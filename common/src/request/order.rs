@@ -4,9 +4,9 @@ use validator::Validate;
 #[derive(Validate, Deserialize, Serialize, Clone)]
 pub struct ReqCreateOrder {
     #[validate(length(
-        min = 1,
-        max = 50,
-        message = "请选择你需要购买的商品, 单次最多允许购买50个商品"
+    min = 1,
+    max = 50,
+    message = "请选择你需要购买的商品, 单次最多允许购买50个商品"
     ))]
     pub products: Option<Vec<OrderProduct>>,
     #[validate(range(min = 1, message = "请选择收获地址"))]
@@ -22,5 +22,5 @@ pub struct OrderProduct {
     #[validate(range(min = 1, message = "非法的商品sku"))]
     pub product_sku_id: Option<i64>,
     #[validate(range(min = 1, max = 10000, message = "单次购买数量在1-10000之间"))]
-    pub amount: Option<i64>,
+    pub amount: Option<i32>,
 }

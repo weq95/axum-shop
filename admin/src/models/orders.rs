@@ -143,13 +143,14 @@ impl Orders {
     ) -> ApiResult<i64> {
         let mut tx = common::postgres().await.begin().await?;
         let order_id = sqlx::query(
-            "insert into orders (no,user_id,address,total_amount,remark) values ($1,$2,$3,$4,$5) RETURNING id"
+            "INSERT INTO orders (no,user_id,address,total_amount,remark,ship_status) VALUES ($1,$2,$3,$4,$5,$6) RETURNING id"
         )
             .bind(Self::get_order_no().await?)
             .bind(user_id)
             .bind(json!(address))
             .bind(total_money)
             .bind(remark)
+            .bind(0)
             .fetch_one(&mut tx)
             .await?.get::<i64, _>("id");
 
@@ -188,22 +189,18 @@ impl Orders {
         Ok(sqlx::query(
             "update order_items set updated_at = $1, address = $2 where id = $3 and user_id = $4",
         )
-        .bind(chrono::Utc::now().naive_utc())
-        .bind(addr)
-        .bind(id)
-        .bind(user_id)
-        .execute(common::postgres().await)
-        .await?
-        .rows_affected()
+            .bind(chrono::Utc::now().naive_utc())
+            .bind(addr)
+            .bind(id)
+            .bind(user_id)
+            .execute(common::postgres().await)
+            .await?
+            .rows_affected()
             > 0)
     }
 
     // 获取订单号
     async fn get_order_no() -> ApiResult<String> {
-        Ok(loop {
-            let no = common::snow_id().await;
-
-            break no.to_string();
-        })
+        Ok(common::snow_id().await.to_string())
     }
 }

@@ -21,7 +21,7 @@ pub struct CustomProductSku {
     pub product_id: i64,
     pub title: String,
     pub descr: String,
-    pub stock: i64,
+    pub stock: i32,
     pub on_sale: bool,
     pub price: i64,
 }
@@ -101,7 +101,7 @@ impl ProductSku {
             idx += 2;
         }
 
-        let query_builder = format!("select sku.*,p.on_sale from ( SELECT id,product_id,stock FROM product_skus WHERE {} ) as sku \
+        let query_builder = format!("select sku.*,p.on_sale from ( SELECT id,product_id,stock,title,description,price FROM product_skus WHERE {} ) as sku \
         left join  products as p ON sku.product_id = p.id", &rows[..(rows.len() - 3)]);
 
         Ok(sqlx::query_with(&query_builder, arg)
@@ -111,11 +111,11 @@ impl ProductSku {
             .map(|row| CustomProductSku {
                 id: row.get::<i64, _>("id"),
                 product_id: row.get::<i64, _>("product_id"),
-                title: "".to_string(),
-                descr: "".to_string(),
-                stock: row.get::<i64, _>("stock"),
-                on_sale: row.get::<bool, _>("id"),
-                price: row.get::<i64, _>("stock"),
+                title: row.get("title"),
+                descr: row.get("description"),
+                stock: row.get::<i32, _>("stock"),
+                on_sale: true,
+                price: row.get::<f64, _>("price") as i64,
             })
             .map(|sku| (sku.product_id, sku))
             .collect::<HashMap<i64, CustomProductSku>>())

@@ -167,7 +167,7 @@ impl UserAddress {
         user_id: i64,
     ) -> ApiResult<HashMap<String, serde_json::Value>> {
         let info = sqlx::query(
-            "select province,city,district,address,zip,contact_name,contact_phone where id = $1 and user_id = $2",
+            "select province,city,district,address,zip,contact_name,contact_phone from user_address where id = $1 and user_id = $2",
         )
             .bind(id)
             .bind(user_id)

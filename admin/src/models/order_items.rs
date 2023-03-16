@@ -49,7 +49,7 @@ impl OrderItems {
 
         Ok(sqlx::query_with(
             &*format!(
-                "inset into order_items (order_id,product_id,product_sku) values {}",
+                "insert into order_items (order_id,product_id,product_sku) values {}",
                 sql_builder[..sql_builder.len() - 1].to_string()
             ),
             arg_builder,
