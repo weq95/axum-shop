@@ -1,7 +1,6 @@
 use std::collections::HashMap;
 
 use sqlx::Row;
-use validator::Validate;
 
 use common::error::ApiError;
 use common::request::user::ReqGetUser;

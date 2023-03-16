@@ -1,8 +1,10 @@
+use serde::{Deserialize, Serialize};
+use serde_json::json;
 use std::collections::HashMap;
 
-use sqlx::{Postgres, Transaction};
+use sqlx::{Arguments, Postgres, Transaction};
 
-use common::error::{ApiError, ApiResult};
+use common::error::ApiResult;
 
 #[derive(Debug, sqlx::FromRow)]
 pub struct OrderItems {
@@ -18,7 +20,7 @@ pub struct OrderItems {
 }
 
 /// 订单详情中product_sku
-#[derive(Debug)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct Sku {
     id: i64,
     price: i64,
@@ -33,8 +35,29 @@ impl OrderItems {
         items: HashMap<i64, Sku>,
         tx: &mut Transaction<'_, Postgres>,
     ) -> ApiResult<bool> {
-        Ok::<bool, ApiError>(true);
-        todo!()
+        let item_len = &items.len();
+        let mut sql_builder = String::new();
+        let mut idx = 1i32;
+        let mut arg_builder = sqlx::postgres::PgArguments::default();
+        for (product_id, sku) in items.iter() {
+            sql_builder.push_str(format!(" (${}, ${}, ${}),", idx, idx + 1, idx + 2).as_str());
+            idx += 2;
+            arg_builder.add(product_id);
+            arg_builder.add(order_id);
+            arg_builder.add(json!(sku));
+        }
+
+        Ok(sqlx::query_with(
+            &*format!(
+                "inset into order_items (order_id,product_id,product_sku) values {}",
+                sql_builder[..sql_builder.len() - 1].to_string()
+            ),
+            arg_builder,
+        )
+        .execute(tx)
+        .await?
+        .rows_affected()
+            == (*item_len as u64))
     }
 
     // 创建生成sku

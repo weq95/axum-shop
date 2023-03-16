@@ -45,10 +45,13 @@ impl OrderController {
             Err(err) => return ApiResponse::fail_msg(err.to_string()).json(),
         };
 
-        let address = match UserAddress::harvest_addr(params.inner.address_id.unwrap()).await {
-            Ok(addr) => addr,
-            Err(_err) => return ApiResponse::fail_msg("收获地址未找到".to_string()).json(),
-        };
+        let address =
+            match UserAddress::harvest_addr(params.inner.address_id.unwrap(), params.claims.id)
+                .await
+            {
+                Ok(addr) => addr,
+                Err(_err) => return ApiResponse::fail_msg("收获地址未找到".to_string()).json(),
+            };
 
         let mut order_items: HashMap<i64, _> = HashMap::new();
         let mut total_money = 0i64;

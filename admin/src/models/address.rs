@@ -3,7 +3,6 @@ use std::collections::{HashMap, HashSet};
 use chrono::{DateTime, NaiveDateTime, Utc};
 use sqlx::postgres::PgArguments;
 use sqlx::{Arguments, Row};
-use validator::Validate;
 
 use common::error::{ApiError, ApiResult};
 use common::request::address::ReqAddressInfo;
@@ -163,24 +162,28 @@ impl UserAddress {
     }
 
     // 订单收获地址
-    pub async fn harvest_addr(id: i64) -> ApiResult<HashMap<String, serde_json::Value>> {
+    pub async fn harvest_addr(
+        id: i64,
+        user_id: i64,
+    ) -> ApiResult<HashMap<String, serde_json::Value>> {
         let info = sqlx::query(
-            "select province,city,district,address,zip,contact_name,contact_phone where id = #1",
+            "select province,city,district,address,zip,contact_name,contact_phone where id = $1 and user_id = $2",
         )
-        .bind(id)
-        .fetch_one(common::pgsql::db().await)
-        .await
-        .map(|row| UserAddress {
-            province: row.get::<i32, _>("province"),
-            city: row.get::<i32, _>("city"),
-            district: row.get::<i32, _>("province"),
-            address: row.get("address"),
-            zip: row.get::<i32, _>("zip"),
-            contact_name: row.get("contact_name"),
-            contact_phone: row.get("contact_phone"),
-            ..UserAddress::default()
-        })
-        .map_err(|err| ApiError::Error(err.to_string()))?;
+            .bind(id)
+            .bind(user_id)
+            .fetch_one(common::pgsql::db().await)
+            .await
+            .map(|row| UserAddress {
+                province: row.get::<i32, _>("province"),
+                city: row.get::<i32, _>("city"),
+                district: row.get::<i32, _>("province"),
+                address: row.get("address"),
+                zip: row.get::<i32, _>("zip"),
+                contact_name: row.get("contact_name"),
+                contact_phone: row.get("contact_phone"),
+                ..UserAddress::default()
+            })
+            .map_err(|err| ApiError::Error(err.to_string()))?;
         let addr_map = get_addr_name(HashSet::from([
             info.province,
             info.city,
