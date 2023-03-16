@@ -25,7 +25,7 @@ pub struct Product {
 impl Product {
     /// 创建
     pub async fn create(product: Product) -> ApiResult<u64> {
-        let mut tx = common::pgsql::db().await.begin().await?;
+        let mut tx = common::postgres().await.begin().await?;
 
         let product_sku = product
             .skus
@@ -61,7 +61,7 @@ impl Product {
         let mut result: Product =
             sqlx::query("select * from products where id = $1 and on_sale = true")
                 .bind(product_id)
-                .fetch_optional(common::pgsql::db().await)
+                .fetch_optional(common::postgres().await)
                 .await?
                 .map(|row| Product {
                     id: row.get::<i64, _>("id"),
@@ -107,7 +107,7 @@ impl Product {
         sql_str.push_str(&format!(" limit {} offset {}", page_size, per_page));
 
         let mut result: Vec<Self> = sqlx::query(&*sql_str)
-            .fetch_all(common::pgsql::db().await)
+            .fetch_all(common::postgres().await)
             .await?
             .into_iter()
             .map(|row| Product {
@@ -128,7 +128,7 @@ impl Product {
             product.image_preview_url().await.skus().await?
         }
         let count = sqlx::query(&*count_str)
-            .fetch_one(common::pgsql::db().await)
+            .fetch_one(common::postgres().await)
             .await?
             .get::<i64, _>("count");
 
@@ -141,7 +141,7 @@ impl Product {
             sqlx::query("select count(*) as count from products where title = $1 and id != $2")
                 .bind(product.title.clone())
                 .bind(product.id)
-                .fetch_one(common::pgsql::db().await)
+                .fetch_one(common::postgres().await)
                 .await?
                 .get::<i64, _>("count");
         if count > 0 {
@@ -153,7 +153,7 @@ impl Product {
             .iter()
             .min_by(|a, b| a.price.partial_cmp(&b.price).unwrap())
             .unwrap();
-        let mut tx = common::pgsql::db().await.begin().await?;
+        let mut tx = common::postgres().await.begin().await?;
         ProductSku::delete_product_sku(product.id, &mut tx).await?;
         let row_bool = sqlx::query("update products set title = $1, description = $2, image = $3, on_sale = $4, sku_price = $5 where id = $6")
             .bind(product.title.clone())
@@ -185,7 +185,7 @@ impl Product {
     /// 删除
     pub async fn delete(product_id: u64) -> ApiResult<bool> {
         FavoriteProducts::un_favorite_product(product_id as i64).await?;
-        let mut tx = common::pgsql::db().await.begin().await?;
+        let mut tx = common::postgres().await.begin().await?;
 
         ProductSku::delete_product_sku(product_id as i64, &mut tx).await?;
 
@@ -249,7 +249,7 @@ impl Product {
         Ok(
             sqlx::query("select exists (select id from products where title = $1)")
                 .bind(title)
-                .fetch_one(common::pgsql::db().await)
+                .fetch_one(common::postgres().await)
                 .await?
                 .get::<bool, _>("exists"),
         )

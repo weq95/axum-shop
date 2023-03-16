@@ -30,7 +30,7 @@ impl ProductSku {
     pub async fn get(id: i64) -> ApiResult<Self> {
         let result: Self = sqlx::query_as("select * from product_skus where id = $1")
             .bind(id)
-            .fetch_one(common::pgsql::db().await)
+            .fetch_one(common::postgres().await)
             .await?;
 
         Ok(result)
@@ -41,7 +41,7 @@ impl ProductSku {
         let result: Vec<Self> =
             sqlx::query_as("select * from product_skus where product_id = any($1)")
                 .bind(product_ids)
-                .fetch_all(common::pgsql::db().await)
+                .fetch_all(common::postgres().await)
                 .await?;
 
         let mut data_map: HashMap<i64, Vec<Self>> = HashMap::new();
@@ -105,7 +105,7 @@ impl ProductSku {
         left join  products as p ON sku.product_id = p.id", &rows[..(rows.len() - 3)]);
 
         Ok(sqlx::query_with(&query_builder, arg)
-            .fetch_all(common::pgsql::db().await)
+            .fetch_all(common::postgres().await)
             .await?
             .iter()
             .map(|row| CustomProductSku {

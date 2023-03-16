@@ -46,7 +46,7 @@ impl Admin {
         // 注意这里没数据不会报错
         sql_str
             .build()
-            .fetch_optional(common::pgsql::db().await)
+            .fetch_optional(common::postgres().await)
             .await?
             .map(|row| {
                 Ok(GetUser {
@@ -106,7 +106,7 @@ impl Admin {
 
         let count = count_str
             .build()
-            .fetch_one(common::pgsql::db().await)
+            .fetch_one(common::postgres().await)
             .await?
             .get::<i64, &str>("total") as usize;
         pagination.set_total(count);
@@ -118,7 +118,7 @@ impl Admin {
 
         let data = sql_str
             .build()
-            .fetch_all(common::pgsql::db().await)
+            .fetch_all(common::postgres().await)
             .await?
             .into_iter()
             .map(|row| GetUser {
@@ -141,7 +141,7 @@ impl Admin {
         let id: i64 = sqlx::query("insert into users (name, age, nickname, phone, email) values($1, $2, $3, $4, $5) RETURNING id")
             .bind(&info.name).bind(&info.age).bind(&info.nickname)
             .bind(phone).bind(&info.email)
-            .fetch_one(common::pgsql::db().await)
+            .fetch_one(common::postgres().await)
             .await?.get::<i64, &str>("id");
 
         Ok(id as u64)
@@ -153,7 +153,7 @@ impl Admin {
             .bind(&info.name.unwrap())
             .bind(&info.age.unwrap())
             .bind(&info.id.unwrap())
-            .execute(common::pgsql::db().await)
+            .execute(common::postgres().await)
             .await?
             .rows_affected();
 
@@ -165,7 +165,7 @@ impl Admin {
         FavoriteProducts::un_favorite_user(userid as i64).await?;
         let rows_num = sqlx::query("delete from users where id = $1")
             .bind(userid as i64)
-            .execute(common::pgsql::db().await)
+            .execute(common::postgres().await)
             .await?
             .rows_affected();
 
@@ -179,7 +179,7 @@ impl Admin {
     ) -> ApiResult<()> {
         let count = sqlx::query("select count(*) as count from cart_items where user_id = $1")
             .bind(user_id)
-            .fetch_one(common::pgsql::db().await)
+            .fetch_one(common::postgres().await)
             .await?
             .get::<i64, _>("count") as usize;
         pagination.set_total(count).total_pages();
@@ -192,7 +192,7 @@ impl Admin {
                 .bind(user_id)
                 .bind(pagination.offset() as i64)
                 .bind(pagination.limit() as i64)
-                .fetch_all(common::pgsql::db().await)
+                .fetch_all(common::postgres().await)
                 .await?.iter().map(|row| {
                 result.push(HashMap::from([
                     ("id".to_string(), serde_json::to_value(row.get::<i64, _>("id")).unwrap()),

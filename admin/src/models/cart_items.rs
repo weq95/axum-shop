@@ -28,7 +28,7 @@ impl CartItems {
             sqlx::query("select id from cart_items where user_id = $1 and product_id = $2")
                 .bind(userid)
                 .bind(product_id)
-                .fetch_one(common::pgsql::db().await)
+                .fetch_one(common::postgres().await)
                 .await
                 .ok();
 
@@ -47,7 +47,7 @@ SELECT EXISTS (SELECT id FROM product_skus WHERE id = $2)",
         )
         .bind(product_id)
         .bind(sku_id)
-        .fetch_all(common::pgsql::db().await)
+        .fetch_all(common::postgres().await)
         .await?
         .iter()
         .map(|row| row.get::<bool, _>("exists"))
@@ -69,7 +69,7 @@ SELECT EXISTS (SELECT id FROM product_skus WHERE id = $2)",
             .bind(product_id)
             .bind(sku_id)
             .bind(amount as i16)
-            .fetch_one(common::pgsql::db().await)
+            .fetch_one(common::postgres().await)
             .await?.get::<i64, _>("id") as u64)
     }
 
@@ -89,7 +89,7 @@ SELECT EXISTS (SELECT id FROM product_skus WHERE id = $2)",
             sqlx::query(&*(sql_str.to_owned() + " where amount > 0 and id = $2"))
                 .bind(val as i16)
                 .bind(id)
-                .execute(common::pgsql::db().await)
+                .execute(common::postgres().await)
                 .await?
                 .rows_affected()
                 > 0,
@@ -100,7 +100,7 @@ SELECT EXISTS (SELECT id FROM product_skus WHERE id = $2)",
     pub async fn delete(id: Vec<i64>) -> ApiResult<u64> {
         Ok(sqlx::query("delete from cart_items where id = any($1)")
             .bind(id)
-            .execute(common::pgsql::db().await)
+            .execute(common::postgres().await)
             .await?
             .rows_affected())
     }
@@ -109,7 +109,7 @@ SELECT EXISTS (SELECT id FROM product_skus WHERE id = $2)",
     pub async fn remove_user(user_id: i64) -> ApiResult<u64> {
         Ok(sqlx::query("delete from cart_items where user_id = $1")
             .bind(user_id)
-            .execute(common::pgsql::db().await)
+            .execute(common::postgres().await)
             .await?
             .rows_affected())
     }
@@ -118,7 +118,7 @@ SELECT EXISTS (SELECT id FROM product_skus WHERE id = $2)",
     pub async fn remove_product(product_id: i64) -> ApiResult<u64> {
         Ok(sqlx::query("delete from cart_items where product_id = $1")
             .bind(product_id)
-            .execute(common::pgsql::db().await)
+            .execute(common::postgres().await)
             .await?
             .rows_affected())
     }
@@ -128,7 +128,7 @@ SELECT EXISTS (SELECT id FROM product_skus WHERE id = $2)",
         Ok(
             sqlx::query("delete from cart_items where product_sku_id = $1")
                 .bind(product_sku_id)
-                .execute(common::pgsql::db().await)
+                .execute(common::postgres().await)
                 .await?
                 .rows_affected(),
         )
@@ -143,7 +143,7 @@ SELECT EXISTS (SELECT id FROM product_skus WHERE id = $2)",
             sqlx::query_as("select * from cart_items where user_id = $1 and product_id = any($2)")
                 .bind(user_id)
                 .bind(product_ids)
-                .fetch_all(common::pgsql::db().await)
+                .fetch_all(common::postgres().await)
                 .await?;
 
         let mut hash_data: HashMap<i64, CartItems> = HashMap::new();
@@ -161,7 +161,7 @@ SELECT EXISTS (SELECT id FROM product_skus WHERE id = $2)",
         )
         .bind(user_id)
         .bind(product_ids)
-        .fetch_all(common::pgsql::db().await)
+        .fetch_all(common::postgres().await)
         .await?
         .iter()
         .map(|row| row.get::<i64, _>("product_id"))

@@ -150,7 +150,7 @@ impl AdminAuth {
     pub async fn get_casbin_rule(role_name: String) -> ApiResult<CasbinRule> {
         sqlx::query("SELECT id,ptype,v0,v1,v2,v3,v4,v5 FROM casbin_rule WHERE v0 = $1")
             .bind(role_name)
-            .fetch_one(common::pgsql::db().await)
+            .fetch_one(common::postgres().await)
             .await
             .map(|row| {
                 Ok(CasbinRule {
@@ -183,7 +183,7 @@ impl AdminAuth {
             "SELECT id,ptype,v0,v1,v2,v3,v4,v5 FROM casbin_rule WHERE v0 IN ($1) ORDER BY id ASC",
         )
         .bind(role_names)
-        .fetch_all(common::pgsql::db().await)
+        .fetch_all(common::postgres().await)
         .await?
         .into_iter()
         .map(|row| CasbinRule {

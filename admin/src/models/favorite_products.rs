@@ -20,7 +20,7 @@ impl FavoriteProducts {
         )
         .bind(user_id)
         .bind(product_ids)
-        .fetch_all(common::pgsql::db().await)
+        .fetch_all(common::postgres().await)
         .await?
         .iter()
         .map(|row| row.get::<i64, _>("id"))
@@ -37,7 +37,7 @@ select exists (select id from favorite_products where user_id = $2 and product_i
         .bind(product_id)
         .bind(user_id)
         .bind(product_id)
-        .fetch_all(common::pgsql::db().await)
+        .fetch_all(common::postgres().await)
         .await?
         .iter()
         .map(|row| row.get::<bool, _>("exists"))
@@ -60,7 +60,7 @@ select exists (select id from favorite_products where user_id = $2 and product_i
             .bind(user_id)
             .bind(product_id)
             .bind(chrono::Local::now().naive_local())
-            .fetch_one(common::pgsql::db().await)
+            .fetch_one(common::postgres().await)
             .await?
             .get::<i64, _>("id") as u64)
     }
@@ -71,7 +71,7 @@ select exists (select id from favorite_products where user_id = $2 and product_i
             sqlx::query("delete from favorite_products where user_id = $1 and product_id = $2")
                 .bind(user_id)
                 .bind(product_id)
-                .execute(common::pgsql::db().await)
+                .execute(common::postgres().await)
                 .await?
                 .rows_affected(),
         )
@@ -82,7 +82,7 @@ select exists (select id from favorite_products where user_id = $2 and product_i
         Ok(
             sqlx::query("delete from favorite_products where product_id = $1")
                 .bind(product_id)
-                .execute(common::pgsql::db().await)
+                .execute(common::postgres().await)
                 .await?
                 .rows_affected(),
         )
@@ -93,7 +93,7 @@ select exists (select id from favorite_products where user_id = $2 and product_i
         Ok(
             sqlx::query("delete from favorite_products where user_id = $1")
                 .bind(user_id)
-                .execute(common::pgsql::db().await)
+                .execute(common::postgres().await)
                 .await?
                 .rows_affected(),
         )

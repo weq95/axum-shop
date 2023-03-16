@@ -5,6 +5,7 @@ use serde_json::json;
 use sqlx::Row;
 
 use common::error::{ApiError, ApiResult};
+use common::Pagination;
 
 use crate::models::order_items::{OrderItems, Sku};
 
@@ -17,7 +18,7 @@ pub struct Orders {
     pub total_amount: i64,
     pub remark: String,
     pub paid_at: Option<chrono::NaiveDateTime>,
-    pub pay_method: Option<PayMethod>,
+    pub pay_method: PayMethod,
     pub pay_no: Option<String>,
     pub refund_status: RefundStatus,
     pub refund_no: Option<String>,
@@ -31,7 +32,8 @@ pub struct Orders {
 }
 
 /// 支付方式
-#[derive(Debug)]
+#[derive(Debug, sqlx::Type)]
+#[repr(i32)]
 pub enum PayMethod {
     // 未支付
     Unknown = 0,
@@ -46,7 +48,8 @@ pub enum PayMethod {
 }
 
 /// 退款状态
-#[derive(Debug)]
+#[derive(Debug, sqlx::Type)]
+#[repr(i32)]
 pub enum RefundStatus {
     // 否(未退款)
     No = 0,
@@ -61,7 +64,8 @@ pub enum RefundStatus {
 }
 
 /// 物理状态
-#[derive(Debug)]
+#[derive(Debug, sqlx::Type)]
+#[repr(i32)]
 pub enum ShipStatus {
     // 处理中
     Processing = 0,
@@ -72,7 +76,7 @@ pub enum ShipStatus {
 }
 
 /// 评价状态
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, sqlx::Type, Serialize, Deserialize)]
 pub enum Reviewed {
     // 未评价
     No = 0,
@@ -86,9 +90,21 @@ impl Default for PayMethod {
     }
 }
 
+impl Into<i32> for PayMethod {
+    fn into(self) -> i32 {
+        self as i32
+    }
+}
+
 impl Default for RefundStatus {
     fn default() -> Self {
         RefundStatus::No
+    }
+}
+
+impl Into<i32> for RefundStatus {
+    fn into(self) -> i32 {
+        self as i32
     }
 }
 
@@ -98,9 +114,21 @@ impl Default for ShipStatus {
     }
 }
 
+impl Into<i32> for ShipStatus {
+    fn into(self) -> i32 {
+        self as i32
+    }
+}
+
 impl Default for Reviewed {
     fn default() -> Self {
         Reviewed::No
+    }
+}
+
+impl Into<i32> for Reviewed {
+    fn into(self) -> i32 {
+        self as i32
     }
 }
 
@@ -113,12 +141,11 @@ impl Orders {
         remark: String,
         order_items: HashMap<i64, Sku>,
     ) -> ApiResult<i64> {
-        let order_no = Self::get_order_no().await?;
-        let mut tx = common::pgsql::db().await.begin().await?;
+        let mut tx = common::postgres().await.begin().await?;
         let order_id = sqlx::query(
             "insert into orders (no,user_id,address,total_amount,remark) values ($1,$2,$3,$4,$5) RETURNING id"
         )
-            .bind(order_no)
+            .bind(Self::get_order_no().await?)
             .bind(user_id)
             .bind(json!(address))
             .bind(total_money)
@@ -136,8 +163,47 @@ impl Orders {
         Ok(order_id)
     }
 
-    // 获取订单号
-    pub async fn get_order_no() -> ApiResult<String> {
+    // 订单信息
+    pub async fn get(id: i64, user_id: i64) -> ApiResult<Orders> {
+        let result: Orders = sqlx::query_as("select * from orders where id = $1 and user_id = $2")
+            .bind(id)
+            .bind(user_id)
+            .fetch_one(common::postgres().await)
+            .await?;
+
+        Ok(result)
+    }
+
+    // 订单列表
+    pub async fn index(pagination: Pagination<Orders>) -> ApiResult<()> {
         todo!()
+    }
+
+    // 更新订单
+    pub async fn update_harvest_addr(
+        id: i64,
+        user_id: i64,
+        addr: serde_json::Value,
+    ) -> ApiResult<bool> {
+        Ok(sqlx::query(
+            "update order_items set updated_at = $1, address = $2 where id = $3 and user_id = $4",
+        )
+            .bind(chrono::Utc::now().naive_utc())
+            .bind(addr)
+            .bind(id)
+            .bind(user_id)
+            .execute(common::postgres().await)
+            .await?
+            .rows_affected()
+            > 0)
+    }
+
+    // 获取订单号
+    async fn get_order_no() -> ApiResult<String> {
+        Ok(loop {
+            let no = common::snow_id().await;
+
+            break no.to_string();
+        })
     }
 }

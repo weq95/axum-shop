@@ -1,12 +1,12 @@
-use serde::{Deserialize, Serialize};
-use serde_json::json;
 use std::collections::HashMap;
 
+use serde::{Deserialize, Serialize};
+use serde_json::json;
 use sqlx::{Arguments, Postgres, Transaction};
 
 use common::error::ApiResult;
 
-#[derive(Debug, sqlx::FromRow)]
+#[derive(Debug, sqlx::FromRow, Serialize, Deserialize)]
 pub struct OrderItems {
     pub id: i64,
     pub order_id: i64,
@@ -75,5 +75,33 @@ impl OrderItems {
             title,
             descr,
         }
+    }
+
+    // 获取子订单
+    pub async fn get(order_id: i64) -> ApiResult<Vec<OrderItems>> {
+        let result: Vec<OrderItems> =
+            sqlx::query_as("select * from order_items where order_id = $1")
+                .bind(order_id)
+                .fetch_all(common::postgres().await)
+                .await?;
+
+        Ok(result)
+    }
+
+    // 删除字订单详情
+    pub async fn delete(
+        order_id: i64,
+        product_id: i64,
+        tx: &mut Transaction<'_, Postgres>,
+    ) -> ApiResult<bool> {
+        Ok(
+            sqlx::query("delete from order_items where order_id = $1 and product_id = $2")
+                .bind(order_id)
+                .bind(product_id)
+                .execute(tx)
+                .await?
+                .rows_affected()
+                > 0,
+        )
     }
 }

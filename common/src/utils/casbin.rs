@@ -27,7 +27,7 @@ use sqlx::{error::Error as SqlError, postgres::PgQueryResult, Arguments, FromRow
 use tokio::sync::RwLock;
 use tower::{Layer, Service};
 
-use crate::{error::ApiResult, pgsql::ConnPool, ApiResponse};
+use crate::{error::ApiResult, ConnPool, ApiResponse};
 
 #[derive(Clone)]
 pub struct CasbinVals {
@@ -184,7 +184,7 @@ pub async fn casbin_layer() -> CasbinLayer {
         .await
         .unwrap();
 
-    let adapter = crate::pgsql::get_pg_adapter().await;
+    let adapter = crate::get_pg_adapter().await;
     let casbin_val = CasbinLayer::new(model, adapter).await;
     {
         casbin_val
@@ -379,7 +379,7 @@ impl PgSqlAdapter {
 impl Adapter for PgSqlAdapter {
     async fn load_policy(&self, m: &mut dyn Model) -> casbin::Result<()> {
         let rules = sqlx::query("SELECT * FROM casbin_rule")
-            .fetch_all(crate::pgsql::db().await)
+            .fetch_all(crate::postgres().await)
             .await
             .map_err(|err| AdapterError(Box::new(err)))?
             .into_iter()
@@ -426,7 +426,7 @@ impl Adapter for PgSqlAdapter {
             .bind(g_filter[3]).bind(g_filter[4]).bind(g_filter[5])
             .bind(p_filter[0]).bind(p_filter[1]).bind(p_filter[2])
             .bind(p_filter[3]).bind(p_filter[4]).bind(p_filter[5])
-            .fetch_all(crate::pgsql::db().await).await
+            .fetch_all(crate::postgres().await).await
             .map_err(|err| AdapterError(Box::new(err)))?
             .into_iter().map(|row| {
             CasbinRule {
@@ -482,7 +482,7 @@ impl Adapter for PgSqlAdapter {
             }
         }
 
-        let mut transaction = crate::pgsql::db()
+        let mut transaction = crate::postgres()
             .await
             .begin()
             .await
@@ -525,7 +525,7 @@ impl Adapter for PgSqlAdapter {
     }
 
     async fn clear_policy(&mut self) -> casbin::Result<()> {
-        let mut transaction = crate::pgsql::db()
+        let mut transaction = crate::postgres()
             .await
             .begin()
             .await
@@ -566,7 +566,7 @@ impl Adapter for PgSqlAdapter {
             .filter_map(|x: &Vec<String>| self.save_policy_line(ptype, x))
             .collect::<Vec<NewCasbinRule>>();
 
-        let mut transaction = crate::pgsql::db()
+        let mut transaction = crate::postgres()
             .await
             .begin()
             .await
@@ -618,7 +618,7 @@ impl Adapter for PgSqlAdapter {
         ptype: &str,
         rules: Vec<Vec<String>>,
     ) -> casbin::Result<bool> {
-        let mut transaction = crate::pgsql::db()
+        let mut transaction = crate::postgres()
             .await
             .begin()
             .await
@@ -700,7 +700,7 @@ impl Adapter for PgSqlAdapter {
 
         let sql_str = "DELETE FROM casbin_rule WHERE ptype = ".to_owned() + ptype + " and ";
         sqlx::query_with(&*(sql_str.as_str().to_owned() + placeholder), arg)
-            .execute(crate::pgsql::db().await)
+            .execute(crate::postgres().await)
             .await
             .map(|n| PgQueryResult::rows_affected(&n) >= 1)
             .map_err(|err| AdapterError(Box::new(err)))?;
