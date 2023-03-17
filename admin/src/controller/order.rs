@@ -2,15 +2,17 @@ use std::collections::HashMap;
 
 use axum::extract::Path;
 use axum::response::IntoResponse;
+use axum::{Extension, Json};
 use serde_json::json;
 use validator::Validate;
 
-use common::{ApiResponse, AppExtractor, Pagination};
 use common::error::format_errors;
+use common::jwt::Claims;
 use common::order::ReqCreateOrder;
+use common::{ApiResponse, Pagination};
 
 use crate::models::address::UserAddress;
-use crate::models::order_items::{OrderItems, Sku};
+use crate::models::order_items::OrderItems;
 use crate::models::orders::Orders;
 use crate::models::product_skus::ProductSku;
 
@@ -18,13 +20,11 @@ pub struct OrderController;
 
 impl OrderController {
     // 订单列表
-    pub async fn index(
-        params: AppExtractor<HashMap<String, serde_json::Value>>,
-    ) -> impl IntoResponse {}
+    pub async fn index() -> impl IntoResponse {}
 
     // 订单详情
-    pub async fn get(Path((id, user_id)): Path<(i64, i64)>) -> impl IntoResponse {
-        let order = match Orders::get(id, user_id).await {
+    pub async fn get(Path(id): Path<i64>, Extension(user): Extension<Claims>) -> impl IntoResponse {
+        let order = match Orders::get(id, user.id).await {
             Ok(result) => result,
             Err(e) => return ApiResponse::fail_msg(e.to_string()).json(),
         };
@@ -54,17 +54,20 @@ impl OrderController {
         "updated_at": order.updated_at.format("%Y-%m-%d %H:%M:%S").to_string(),
             "items": order_items,
         })))
-            .json()
+        .json()
     }
 
     // 保存订单
-    pub async fn store(params: AppExtractor<ReqCreateOrder>) -> impl IntoResponse {
+    pub async fn store(
+        Extension(user): Extension<Claims>,
+        Json(inner): Json<ReqCreateOrder>,
+    ) -> impl IntoResponse {
         let mut ids = HashMap::new();
-        match &params.inner.validate() {
+        match &inner.validate() {
             Ok(()) => (),
             Err(e) => return ApiResponse::fail_msg(e.to_string()).json(),
         }
-        if let Some(result) = &params.inner.products {
+        if let Some(result) = &inner.products {
             for req in result {
                 match req.validate() {
                     Ok(()) => {
@@ -75,7 +78,7 @@ impl OrderController {
                             common::FAIL,
                             Some(json!(format_errors(e))),
                         )
-                            .json();
+                        .json();
                     }
                 }
             }
@@ -86,17 +89,14 @@ impl OrderController {
             Err(err) => return ApiResponse::fail_msg(err.to_string()).json(),
         };
 
-        let address =
-            match UserAddress::harvest_addr(params.inner.address_id.unwrap(), params.claims.id)
-                .await
-            {
-                Ok(addr) => addr,
-                Err(_err) => return ApiResponse::fail_msg("收获地址未找到".to_string()).json(),
-            };
+        let address = match UserAddress::harvest_addr(inner.address_id.unwrap(), user.id).await {
+            Ok(addr) => addr,
+            Err(_err) => return ApiResponse::fail_msg("收获地址未找到".to_string()).json(),
+        };
 
         let mut order_items: HashMap<i64, _> = HashMap::new();
         let mut total_money = 0i64;
-        if let Some(order) = &params.inner.products {
+        if let Some(order) = &inner.products {
             for (idx, item) in order.iter().enumerate() {
                 match values.get(&item.product_id.unwrap()) {
                     Some(sku) => {
@@ -125,7 +125,7 @@ impl OrderController {
                                 sku.title.clone(),
                                 sku.descr.clone(),
                             )
-                                .await,
+                            .await,
                         );
                     }
                     None => {
@@ -136,13 +136,13 @@ impl OrderController {
         }
 
         let result = Orders::create(
-            params.claims.id,
+            user.id,
             total_money,
             sqlx::types::Json(address),
-            params.inner.remark.unwrap(),
+            inner.remark.unwrap(),
             order_items,
         )
-            .await;
+        .await;
         match result {
             Ok(order_id) => ApiResponse::response(Some(json!({ "id": order_id }))).json(),
             Err(e) => ApiResponse::fail_msg(e.to_string()).json(),
@@ -150,18 +150,21 @@ impl OrderController {
     }
 
     // 更新订单(收货信息)
-    pub async fn update(params: AppExtractor<(i64, i64)>) -> impl IntoResponse {
-        let (id, addr_id) = params.inner;
+    pub async fn update(
+        Path(id): Path<i64>,
+        Extension(user): Extension<Claims>,
+        Json(addr_id): Json<i64>,
+    ) -> impl IntoResponse {
         if id <= 0 || addr_id <= 0 {
             return ApiResponse::fail_msg("参数错误".to_string()).json();
         }
 
-        let address = match UserAddress::harvest_addr(addr_id, params.claims.id).await {
+        let address = match UserAddress::harvest_addr(addr_id, user.id).await {
             Ok(result) => result,
             Err(_err) => return ApiResponse::fail_msg("收获地址未找到".to_string()).json(),
         };
 
-        match Orders::update_harvest_addr(id, params.claims.id, json!(address)).await {
+        match Orders::update_harvest_addr(id, user.id, json!(address)).await {
             Ok(bool_val) => ApiResponse::response(Some(json!({ "status": bool_val }))).json(),
             Err(e) => ApiResponse::fail_msg(e.to_string()).json(),
         }

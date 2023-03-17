@@ -97,12 +97,15 @@ SELECT EXISTS (SELECT id FROM product_skus WHERE id = $2)",
     }
 
     // 删除
-    pub async fn delete(id: Vec<i64>) -> ApiResult<u64> {
-        Ok(sqlx::query("delete from cart_items where id = any($1)")
-            .bind(id)
-            .execute(common::postgres().await)
-            .await?
-            .rows_affected())
+    pub async fn delete(id: Vec<i64>, user_id: i64) -> ApiResult<u64> {
+        Ok(
+            sqlx::query("delete from cart_items where id = any($1) and user_id = $2")
+                .bind(id)
+                .bind(user_id)
+                .execute(common::postgres().await)
+                .await?
+                .rows_affected(),
+        )
     }
 
     // 清空用户购物车

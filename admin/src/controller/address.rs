@@ -3,14 +3,15 @@ use std::sync::Arc;
 
 use axum::extract::Path;
 use axum::response::IntoResponse;
-use axum::Extension;
+use axum::{Extension, Json};
 use serde_json::json;
 use validator::Validate;
 
 use common::error::format_errors;
+use common::jwt::Claims;
 use common::request::address::ReqAddressInfo;
 use common::response::address::{ResAddrResult, ResAddress};
-use common::{ApiResponse, AppExtractor};
+use common::ApiResponse;
 
 use crate::models::address::{addr_result as AddrResult, get_addr_name as AddrName, UserAddress};
 use crate::AppState;
@@ -94,8 +95,11 @@ impl AddressController {
     }
 
     /// 用户创建收获地址
-    pub async fn create_address(params: AppExtractor<ReqAddressInfo>) -> impl IntoResponse {
-        match &params.inner.validate() {
+    pub async fn create_address(
+        Extension(user): Extension<Claims>,
+        Json(inner): Json<ReqAddressInfo>,
+    ) -> impl IntoResponse {
+        match &inner.validate() {
             Ok(()) => (),
             Err(e) => {
                 return ApiResponse::success_code_data(
@@ -106,7 +110,7 @@ impl AddressController {
             }
         }
 
-        match UserAddress::create(params.claims.id, params.inner).await {
+        match UserAddress::create(user.id, inner).await {
             Ok(id) => ApiResponse::response(Some(json!({ "id": id }))).json(),
             Err(e) => ApiResponse::fail_msg(e.to_string()).json(),
         }
@@ -115,9 +119,10 @@ impl AddressController {
     /// 用户更新收获地址
     pub async fn update_address(
         Path(id): Path<i64>,
-        params: AppExtractor<ReqAddressInfo>,
+        Extension(user): Extension<Claims>,
+        Json(inner): Json<ReqAddressInfo>,
     ) -> impl IntoResponse {
-        match &params.inner.validate() {
+        match &inner.validate() {
             Ok(()) => (),
             Err(e) => {
                 return ApiResponse::success_code_data(
@@ -127,7 +132,8 @@ impl AddressController {
                 .json();
             }
         }
-        match UserAddress::update(id, params.claims.id, params.inner).await {
+
+        match UserAddress::update(id, user.id, inner).await {
             Ok(bool_val) => ApiResponse::response(Some(json!({ "status": bool_val }))).json(),
             Err(e) => ApiResponse::fail_msg(e.to_string()).json(),
         }

@@ -4,16 +4,16 @@ use axum::{
     body::Body,
     extract::{Multipart, Path},
     http::Request,
-    response::IntoResponse,
     Json,
+    response::IntoResponse,
 };
 use http::StatusCode;
 use serde_json::json;
 use tokio::io::AsyncWriteExt;
 
+use common::{ApiResponse, IMAGES_PATH, redis, SchoolJson};
 use common::error::{ApiError, ApiResult};
 use common::jwt::{Claims, JWT};
-use common::{redis, ApiResponse, SchoolJson, IMAGES_PATH};
 pub use user::*;
 
 pub mod address;
@@ -25,6 +25,34 @@ pub mod user;
 pub struct CommController;
 
 impl CommController {
+    /*// HTTP请求参数提取示例
+    // GET 请求: https://example.com/orders/user/:id?page=1&page_per=15
+    pub fn example_get(
+        axum::extract::Path(user_id): axum::extract::Path<i32>,
+        axum::extract::Query(pagination): axum::extract::Query<
+            std::collections::HashMap<String, usize>,
+        >,
+        http_header: axum::http::HeaderMap,
+        axum::extract::State(state): axum::extract::State<crate::AppState>,
+        request: axum::http::Requestaxum::body::Body, // || Json || From
+    ) -> impl IntoResponse {
+        // 希望这个示例可以帮助到像我这样的小白
+        // 具体参数提取看文档描述: https://docs.rs/axum/0.6.11/axum/extract/index.html
+        let user = request.extensions().get::<User>();
+        let host = http_header.get("host");
+    }
+
+    pub fn example_get(
+        axum::extract::Path(user_id): axum::extract::Path<i32>,
+        http_header: axum::http::HeaderMap,
+        axum::Extension(user): axum::Extension<Claims>,
+        Json(inner): Json<SchoolJson>,
+    ) -> impl IntoResponse{
+        // 以上代码使用了 Json 提取body体, 所以不能在使用 Request<Body>,
+        // 提取用户信息跟GET请求就不一样了
+
+    }*/
+    
     /// 测试 redis.json 数据接口
     pub async fn test_redis(Json(payload): Json<serde_json::Value>) -> impl IntoResponse {
         let key = payload.get("key").unwrap().as_str().unwrap();
@@ -44,7 +72,7 @@ impl CommController {
                     "access_token": access_token,
                     "refresh_token":refresh_token,
                 })))
-                .json(),
+                    .json(),
                 Err(_) => ApiResponse::fail_msg("refresh_token 刷新失败[02]".to_string()).json(),
             },
             None => ApiResponse::fail_msg("refresh_token 刷新失败[01]".to_string()).json(),
@@ -66,7 +94,7 @@ impl CommController {
                     return ApiResponse::response(Some(
                         json!({ "path": path, "preview_url":preview_url }),
                     ))
-                    .json();
+                        .json();
                 }
 
                 ApiResponse::fail_msg("文件上传失败".to_string()).json()
