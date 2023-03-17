@@ -5,6 +5,8 @@ use std::sync::Arc;
 use axum::Extension;
 use tracing_subscriber::util::SubscriberInitExt;
 
+pub use controller::get_pager;
+
 mod controller;
 mod middleware;
 mod models;

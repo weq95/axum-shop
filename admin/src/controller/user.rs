@@ -15,12 +15,12 @@ use common::response::user::GetUser;
 use common::{
     jwt::{UserSource, UserType, JWT},
     request::user::{ReqCrateUser, ReqGetUser, ReqLogin, ReqUpdateUser},
-    ApiResponse, Pagination,
+    ApiResponse, PagePer, Pagination,
 };
 
 use crate::models::cart_items::CartItems;
 use crate::models::user::Admin;
-use crate::AppState;
+use crate::{get_pager, AppState};
 
 pub struct AdminController;
 
@@ -133,8 +133,11 @@ impl AdminController {
     }
 
     /// 用户列表
-    pub async fn lists(Query(params): Query<serde_json::Value>) -> impl IntoResponse {
-        let mut pagination: Pagination<GetUser> = Pagination::init(&params);
+    pub async fn lists(
+        Query(params): Query<serde_json::Value>,
+        page_per: Option<Query<PagePer>>,
+    ) -> impl IntoResponse {
+        let mut pagination = Pagination::new(vec![], get_pager(page_per));
 
         match Admin::lists(&mut pagination, &params).await {
             Ok(()) => ApiResponse::response(Some(pagination)).json(),
@@ -175,11 +178,11 @@ impl AdminController {
 
     /// 购物车列表
     pub async fn carts(
+        page_per: Option<Query<PagePer>>,
         Extension(user): Extension<Claims>,
-        Json(inner): Json<serde_json::Value>,
     ) -> impl IntoResponse {
         let mut pagination: Pagination<HashMap<String, serde_json::Value>> =
-            Pagination::init(&inner);
+            Pagination::new(vec![], get_pager(page_per));
 
         match Admin::cart_items(user.id, &mut pagination).await {
             Ok(()) => ApiResponse::response(Some(pagination)).json(),

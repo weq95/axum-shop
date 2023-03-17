@@ -112,62 +112,43 @@ pub struct SchoolJson {
 }
 
 /// 通用分页结构
-#[derive(Serialize, Deserialize, Clone)]
+#[derive(Serialize, Clone)]
 pub struct Pagination<T> {
     #[serde(default)]
     data: Option<Box<Vec<T>>>,
     // 总条数
     total: usize,
+    // 当前页
+    page: usize,
     // 页大小
     per_page: usize,
-    // 当前页
-    current_page: usize,
 }
 
-impl<T> Default for Pagination<T> {
+#[derive(Deserialize)]
+pub struct PagePer {
+    page: usize,
+    per_page: usize,
+}
+
+impl Default for PagePer {
     fn default() -> Self {
         Self {
-            data: None,
-            total: 0,
-            per_page: 15,
-            current_page: 1,
+            page: 1,
+            per_page: 30,
         }
     }
 }
 
 impl<T> Pagination<T> {
-    pub fn new(result: Vec<T>) -> Self {
+    pub fn new(result: Vec<T>, page_per: Option<PagePer>) -> Self {
+        let page_per = page_per.unwrap_or_default();
+
         Pagination {
             data: Some(Box::new(result)),
-            ..Self::default()
+            page: page_per.page,
+            per_page: page_per.per_page,
+            total: 0,
         }
-    }
-
-    /// 获取请求页数参数
-    pub fn init(paging: &serde_json::Value) -> Self {
-        let mut pagination = Pagination::default();
-        if let Some(per_page) = parse_field::<String>(&paging, "per_page") {
-            match per_page.parse::<usize>() {
-                Ok(per_page) => {
-                    pagination.set_per_page(per_page);
-                }
-                Err(err) => {
-                    println!("{}", err);
-                }
-            }
-        }
-        if let Some(current_page) = parse_field::<String>(&paging, "current_page") {
-            match current_page.parse::<usize>() {
-                Ok(current_page) => {
-                    pagination.set_current_page(current_page);
-                }
-                Err(err) => {
-                    println!("{}", err);
-                }
-            }
-        }
-
-        pagination
     }
 
     /// 设置总页数
@@ -177,19 +158,6 @@ impl<T> Pagination<T> {
         self
     }
 
-    /// 设置分页大小
-    pub fn set_per_page(&mut self, per_page: usize) -> &mut Pagination<T> {
-        self.per_page = per_page;
-
-        self
-    }
-
-    /// 设置当前页
-    pub fn set_current_page(&mut self, current_page: usize) -> &mut Pagination<T> {
-        self.current_page = current_page;
-
-        self
-    }
     /// 计算总页数
     pub fn total_pages(&mut self) -> usize {
         if self.total % self.per_page == 0 {
@@ -201,18 +169,18 @@ impl<T> Pagination<T> {
 
     /// 是否存在上一页
     pub fn has_previous_page(&self) -> bool {
-        self.current_page > 1
+        self.page > 1
     }
 
     /// 是否存在下一页
     pub fn has_next_page(&mut self) -> bool {
-        self.current_page < self.total_pages()
+        self.page < self.total_pages()
     }
 
     /// 上一页页码
     pub fn previous_page_number(&mut self) -> Option<usize> {
         if self.has_previous_page() {
-            return Some(self.current_page - 1);
+            return Some(self.page - 1);
         }
 
         None
@@ -221,14 +189,14 @@ impl<T> Pagination<T> {
     /// 下一页页码
     pub fn next_page_number(&mut self) -> Option<usize> {
         if self.has_next_page() {
-            return Some(self.current_page + 1);
+            return Some(self.page + 1);
         }
 
         None
     }
 
     pub fn offset(&self) -> usize {
-        (self.current_page - 1) * self.per_page
+        (self.page - 1) * self.per_page
     }
 
     pub fn limit(&self) -> usize {

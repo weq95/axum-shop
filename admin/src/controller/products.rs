@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use axum::extract::{Path, Query};
 use axum::response::IntoResponse;
 use axum::Json;
@@ -7,8 +9,9 @@ use sqlx::types::Json as SqlxJson;
 use validator::Validate;
 use validator::ValidationError;
 
-use common::{ApiResponse, Pagination};
+use common::{ApiResponse, PagePer, Pagination};
 
+use crate::get_pager;
 use crate::models::cart_items::CartItems;
 use crate::models::favorite_products::FavoriteProducts;
 use crate::models::product_skus::ProductSku;
@@ -18,18 +21,15 @@ pub struct ProductController;
 
 impl ProductController {
     /// 商品列表
-    pub async fn products(Query(payload): Query<ReqQueryProduct>) -> impl IntoResponse {
-        match Product::products(payload).await {
-            Ok((count, result)) => {
-                let mut result = Pagination::new(result);
+    pub async fn products(
+        page_per: Option<Query<PagePer>>,
+        Query(payload): Query<HashMap<String, String>>,
+    ) -> impl IntoResponse {
+        // let pager = if let Some(Query(a)) = page_per { Some(a) } else { None };
+        let mut pagination: Pagination<Product> = Pagination::new(vec![], get_pager(page_per));
 
-                result
-                    .set_total(count as usize)
-                    .set_per_page(15)
-                    .set_current_page(1);
-
-                ApiResponse::response(Some(result)).json()
-            }
+        match Product::products(payload, &mut pagination).await {
+            Ok(()) => ApiResponse::response(Some(pagination)).json(),
             Err(e) => ApiResponse::fail_msg(e.to_string()).json(),
         }
     }
@@ -203,14 +203,6 @@ impl ProductController {
             Err(e) => ApiResponse::fail_msg(e.to_string()).json(),
         }
     }
-}
-
-#[derive(Deserialize, Serialize)]
-pub struct ReqQueryProduct {
-    pub page_num: Option<i32>,
-    pub page_size: Option<i32>,
-    pub title: Option<String>,
-    pub order_by: Option<String>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Validate)]

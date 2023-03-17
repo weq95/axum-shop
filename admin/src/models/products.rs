@@ -1,10 +1,12 @@
+use std::collections::HashMap;
+
 use serde::{Deserialize, Serialize};
 use sqlx::types::Json;
 use sqlx::Row;
 
 use common::error::{ApiError, ApiResult};
+use common::Pagination;
 
-use crate::controller::products::ReqQueryProduct;
 use crate::models::favorite_products::FavoriteProducts;
 use crate::models::product_skus::ProductSku;
 
@@ -83,28 +85,32 @@ impl Product {
     }
 
     /// 列表
-    pub async fn products(payload: ReqQueryProduct) -> ApiResult<(u64, Vec<Product>)> {
+    pub async fn products(
+        payload: HashMap<String, String>,
+        pagination: &mut Pagination<Product>,
+    ) -> ApiResult<()> {
         let mut sql_str = "select * from products where on_sale=true ".to_string();
         let mut count_str =
             "select count(*) as count from products where on_sale=true ".to_string();
 
-        if let Some(title) = &payload.title {
+        if let Some(title) = payload.get("title") {
             let str = format!(r#" and title::text like '{}%' "#, title);
             sql_str.push_str(&str);
             count_str.push_str(&str);
         }
 
-        if let Some(order_by) = &payload.order_by {
+        if let Some(order_by) = payload.get("order_by") {
             let (field, _type) = common::utils::regex_patch(r#"^(.+)_(asc|desc)$"#, &order_by)?;
             if &field != "" && _type != "" && Self::order_by_field(&field) {
                 sql_str.push_str(&format!(" order by {} {}", field, _type));
             }
         }
 
-        let page_size = payload.page_size.unwrap_or(15);
-        let per_page = page_size * (payload.page_num.unwrap_or(1) - 1);
-
-        sql_str.push_str(&format!(" limit {} offset {}", page_size, per_page));
+        sql_str.push_str(&format!(
+            " limit {} offset {}",
+            pagination.limit(),
+            pagination.offset()
+        ));
 
         let mut result: Vec<Self> = sqlx::query(&*sql_str)
             .fetch_all(common::postgres().await)
@@ -130,9 +136,11 @@ impl Product {
         let count = sqlx::query(&*count_str)
             .fetch_one(common::postgres().await)
             .await?
-            .get::<i64, _>("count");
+            .get::<i64, _>("count") as usize;
+        pagination.set_total(count);
+        pagination.set_data(result);
 
-        Ok((count as u64, result))
+        Ok(())
     }
 
     /// 更新

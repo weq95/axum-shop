@@ -4,16 +4,17 @@ use axum::{
     body::Body,
     extract::{Multipart, Path},
     http::Request,
-    response::IntoResponse,
     Json,
+    response::IntoResponse,
 };
+use axum::extract::Query;
 use http::StatusCode;
 use serde_json::json;
 use tokio::io::AsyncWriteExt;
 
+use common::{ApiResponse, IMAGES_PATH, PagePer, redis, SchoolJson};
 use common::error::{ApiError, ApiResult};
 use common::jwt::{Claims, JWT};
-use common::{redis, ApiResponse, SchoolJson, IMAGES_PATH};
 pub use user::*;
 
 pub mod address;
@@ -23,6 +24,14 @@ pub mod products;
 pub mod user;
 
 pub struct CommController;
+
+pub fn get_pager(page_per: Option<Query<PagePer>>) -> Option<PagePer> {
+    if let Some(Query(result)) = page_per {
+        return Some(result);
+    }
+
+    None
+}
 
 impl CommController {
     /*// HTTP请求参数提取示例
@@ -73,7 +82,7 @@ impl CommController {
                     "access_token": access_token,
                     "refresh_token":refresh_token,
                 })))
-                .json(),
+                    .json(),
                 Err(_) => ApiResponse::fail_msg("refresh_token 刷新失败[02]".to_string()).json(),
             },
             None => ApiResponse::fail_msg("refresh_token 刷新失败[01]".to_string()).json(),
@@ -95,7 +104,7 @@ impl CommController {
                     return ApiResponse::response(Some(
                         json!({ "path": path, "preview_url":preview_url }),
                     ))
-                    .json();
+                        .json();
                 }
 
                 ApiResponse::fail_msg("文件上传失败".to_string()).json()
