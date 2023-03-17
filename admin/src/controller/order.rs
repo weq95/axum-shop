@@ -5,9 +5,9 @@ use axum::response::IntoResponse;
 use serde_json::json;
 use validator::Validate;
 
+use common::{ApiResponse, AppExtractor, Pagination};
 use common::error::format_errors;
 use common::order::ReqCreateOrder;
-use common::{ApiResponse, AppExtractor, Pagination};
 
 use crate::models::address::UserAddress;
 use crate::models::order_items::{OrderItems, Sku};
@@ -20,16 +20,11 @@ impl OrderController {
     // 订单列表
     pub async fn index(
         params: AppExtractor<HashMap<String, serde_json::Value>>,
-    ) -> impl IntoResponse {
-    }
+    ) -> impl IntoResponse {}
 
     // 订单详情
-    pub async fn get(Path(id): Path<i64>, params: AppExtractor<Option<i32>>) -> impl IntoResponse {
-        if id <= 0 {
-            return ApiResponse::fail_msg("Not Found".to_string()).json();
-        }
-
-        let order = match Orders::get(id, params.claims.id).await {
+    pub async fn get(Path((id, user_id)): Path<(i64, i64)>) -> impl IntoResponse {
+        let order = match Orders::get(id, user_id).await {
             Ok(result) => result,
             Err(e) => return ApiResponse::fail_msg(e.to_string()).json(),
         };
@@ -44,23 +39,22 @@ impl OrderController {
         "no": order.no,
         "user_id": order.user_id,
         "address": order.address,
-        "total_amount":order.total_amount,
+        "total_amount":order.total_amount.0,
         "remark": order.remark,
         "paid_at": order.paid_at,
-        "pay_method": Into::<i32>::into(order.pay_method),
+        "pay_method": Into::<i16>::into(order.pay_method),
         "pay_no": order.pay_no,
-        "refund_status":  Into::<i32>::into(order.refund_status),
-        "refund_no":order.refund_no ,
-        "closed": Into::<i32>::into(order.closed),
-        "reviewed": Into::<i32>::into(order.reviewed),
-        "ship_status": Into::<i32>::into(order.ship_status),
-        "ship": order.ship,
+        "refund_status":  Into::<i16>::into(order.refund_status),
+        "refund_no":order.refund_no,
+        "closed": order.closed,
+        "reviewed": order.reviewed,
+        "ship_status": Into::<i16>::into(order.ship_status),
         "extra": order.extra,
-        "created_at":order. created_at,
-        "updated_at": order.updated_at,
+        "created_at": order.created_at.format("%Y-%m-%d %H:%M:%S").to_string(),
+        "updated_at": order.updated_at.format("%Y-%m-%d %H:%M:%S").to_string(),
             "items": order_items,
         })))
-        .json()
+            .json()
     }
 
     // 保存订单
@@ -116,7 +110,7 @@ impl OrderController {
                                 .json();
                         }
 
-                        if &sku.stock < &item.amount.unwrap() {
+                        if sku.stock < item.amount.unwrap() as i32 {
                             return ApiResponse::fail_msg(format!("第{}项商品库存不足", idx + 1))
                                 .json();
                         }
@@ -131,7 +125,7 @@ impl OrderController {
                                 sku.title.clone(),
                                 sku.descr.clone(),
                             )
-                            .await,
+                                .await,
                         );
                     }
                     None => {
@@ -148,7 +142,7 @@ impl OrderController {
             params.inner.remark.unwrap(),
             order_items,
         )
-        .await;
+            .await;
         match result {
             Ok(order_id) => ApiResponse::response(Some(json!({ "id": order_id }))).json(),
             Err(e) => ApiResponse::fail_msg(e.to_string()).json(),

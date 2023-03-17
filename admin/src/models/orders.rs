@@ -15,7 +15,7 @@ pub struct Orders {
     pub no: String,
     pub user_id: i64,
     pub address: sqlx::types::Json<HashMap<String, serde_json::Value>>,
-    pub total_amount: i64,
+    pub total_amount: sqlx::postgres::types::PgMoney,
     pub remark: String,
     pub paid_at: Option<chrono::NaiveDateTime>,
     pub pay_method: PayMethod,
@@ -25,7 +25,6 @@ pub struct Orders {
     pub closed: bool,
     pub reviewed: bool,
     pub ship_status: ShipStatus,
-    pub ship: sqlx::types::Json<Vec<String>>,
     pub extra: String,
     pub created_at: chrono::NaiveDateTime,
     pub updated_at: chrono::NaiveDateTime,
@@ -33,7 +32,7 @@ pub struct Orders {
 
 /// 支付方式
 #[derive(Debug, sqlx::Type)]
-#[repr(i32)]
+#[repr(i16)]
 pub enum PayMethod {
     // 未支付
     Unknown = 0,
@@ -49,7 +48,7 @@ pub enum PayMethod {
 
 /// 退款状态
 #[derive(Debug, sqlx::Type)]
-#[repr(i32)]
+#[repr(i16)]
 pub enum RefundStatus {
     // 否(未退款)
     No = 0,
@@ -65,7 +64,7 @@ pub enum RefundStatus {
 
 /// 物理状态
 #[derive(Debug, sqlx::Type)]
-#[repr(i32)]
+#[repr(i16)]
 pub enum ShipStatus {
     // 处理中
     Processing = 0,
@@ -75,24 +74,15 @@ pub enum ShipStatus {
     Received = 2,
 }
 
-/// 评价状态
-#[derive(Debug, sqlx::Type, Serialize, Deserialize)]
-pub enum Reviewed {
-    // 未评价
-    No = 0,
-    // 已评价
-    Yes = 1,
-}
-
 impl Default for PayMethod {
     fn default() -> Self {
         PayMethod::AliPay
     }
 }
 
-impl Into<i32> for PayMethod {
-    fn into(self) -> i32 {
-        self as i32
+impl Into<i16> for PayMethod {
+    fn into(self) -> i16 {
+        self as i16
     }
 }
 
@@ -102,9 +92,9 @@ impl Default for RefundStatus {
     }
 }
 
-impl Into<i32> for RefundStatus {
-    fn into(self) -> i32 {
-        self as i32
+impl Into<i16> for RefundStatus {
+    fn into(self) -> i16 {
+        self as i16
     }
 }
 
@@ -114,21 +104,9 @@ impl Default for ShipStatus {
     }
 }
 
-impl Into<i32> for ShipStatus {
-    fn into(self) -> i32 {
-        self as i32
-    }
-}
-
-impl Default for Reviewed {
-    fn default() -> Self {
-        Reviewed::No
-    }
-}
-
-impl Into<i32> for Reviewed {
-    fn into(self) -> i32 {
-        self as i32
+impl Into<i16> for ShipStatus {
+    fn into(self) -> i16 {
+        self as i16
     }
 }
 
@@ -189,13 +167,13 @@ impl Orders {
         Ok(sqlx::query(
             "update order_items set updated_at = $1, address = $2 where id = $3 and user_id = $4",
         )
-            .bind(chrono::Utc::now().naive_utc())
-            .bind(addr)
-            .bind(id)
-            .bind(user_id)
-            .execute(common::postgres().await)
-            .await?
-            .rows_affected()
+        .bind(chrono::Utc::now().naive_utc())
+        .bind(addr)
+        .bind(id)
+        .bind(user_id)
+        .execute(common::postgres().await)
+        .await?
+        .rows_affected()
             > 0)
     }
 

@@ -12,7 +12,7 @@ pub struct OrderItems {
     pub order_id: i64,
     pub product_id: i64,
     pub product_sku: sqlx::types::Json<Sku>,
-    pub rating: i8,
+    pub rating: i16,
     pub review: String,
     pub reviewed_at: Option<chrono::NaiveDateTime>,
     pub created_at: chrono::NaiveDateTime,

@@ -176,7 +176,7 @@ impl UserAddress {
             .map(|row| UserAddress {
                 province: row.get::<i32, _>("province"),
                 city: row.get::<i32, _>("city"),
-                district: row.get::<i32, _>("province"),
+                district: row.get::<i32, _>("district"),
                 address: row.get("address"),
                 zip: row.get::<i32, _>("zip"),
                 contact_name: row.get("contact_name"),
