@@ -25,14 +25,6 @@ pub mod user;
 
 pub struct CommController;
 
-pub fn get_pager(page_per: Option<Query<PagePer>>) -> Option<PagePer> {
-    if let Some(Query(result)) = page_per {
-        return Some(result);
-    }
-
-    None
-}
-
 impl CommController {
     /*// HTTP请求参数提取示例
     // 具体参数提取看文档描述: https://docs.rs/axum/0.6.11/axum/extract/index.html

@@ -7,7 +7,7 @@ use sqlx::Row;
 use common::error::{ApiError, ApiResult};
 use common::Pagination;
 
-use crate::models::order_items::{OrderItems, Sku};
+use crate::models::order_items::OrderItems;
 
 #[derive(Debug, sqlx::FromRow)]
 pub struct Orders {
@@ -117,7 +117,7 @@ impl Orders {
         total_money: i64,
         address: sqlx::types::Json<HashMap<String, serde_json::Value>>,
         remark: String,
-        order_items: HashMap<i64, Sku>,
+        order_items: HashMap<i64, HashMap<String, serde_json::Value>>,
     ) -> ApiResult<i64> {
         let mut tx = common::postgres().await.begin().await?;
         let order_id = sqlx::query(
@@ -154,8 +154,67 @@ impl Orders {
     }
 
     // 订单列表
-    pub async fn index(pagination: Pagination<Orders>) -> ApiResult<()> {
-        todo!()
+    pub async fn index(
+        user_id: i64,
+        inner: HashMap<String, serde_json::Value>,
+        pagination: &mut Pagination<HashMap<String, serde_json::Value>>,
+    ) -> ApiResult<()> {
+        let mut order_ids: Vec<i64> = Vec::new();
+        let mut sql = "select id,total_amount,pay_method,refund_status,created_at from orders where user_id = $1".to_string();
+        let mut sql_total = "select count(*) as total from orders where user_id = $1 ".to_string();
+
+        if let Some(start_time) = inner.get("start_time") {
+            sql.push_str(format!(" and created_at >= {} ", start_time).as_str());
+            sql_total.push_str(format!(" and created_at >= {} ", start_time).as_str());
+        }
+
+        if let Some(end_time) = inner.get("end_time") {
+            sql.push_str(format!(" and created_at <= {} ", end_time).as_str());
+            sql_total.push_str(format!(" and created_at <= {} ", end_time).as_str());
+        }
+
+        sql.push_str(" order by created_at desc limit $2 offset $3");
+
+        let result = sqlx::query(&*sql)
+            .bind(user_id)
+            .bind(pagination.limit())
+            .bind(pagination.offset())
+            .fetch_all(common::postgres().await)
+            .await?
+            .iter()
+            .map(|row| {
+                let order_id = row.get::<i64, _>("id");
+                let pay_method = row.get::<PayMethod, _>("pay_method");
+                let refund_status = row.get::<RefundStatus, _>("refund_status");
+                order_ids.push(order_id);
+
+                let created_at = row
+                    .get::<chrono::NaiveDateTime, _>("created_at")
+                    .format("%Y-%m-%d %H:%M:%S")
+                    .to_string();
+                HashMap::from([
+                    ("id".to_string(), serde_json::to_value(order_id).unwrap()),
+                    (
+                        "status".to_string(),
+                        serde_json::to_value(Self::status_name(pay_method, refund_status)).unwrap(),
+                    ),
+                    (
+                        "created_at".to_string(),
+                        serde_json::to_value(created_at).unwrap(),
+                    ),
+                ])
+            })
+            .collect::<Vec<HashMap<String, serde_json::Value>>>();
+
+        let total = sqlx::query(&*sql_total)
+            .bind(user_id)
+            .fetch_one(common::postgres().await)
+            .await?
+            .get::<i64, _>("total");
+        pagination.set_total(total as usize);
+        pagination.set_data(result);
+
+        Ok(())
     }
 
     // 更新订单
@@ -180,5 +239,22 @@ impl Orders {
     // 获取订单号
     async fn get_order_no() -> ApiResult<String> {
         Ok(common::snow_id().await.to_string())
+    }
+
+    // 订单状态
+    fn status_name(pay_method: PayMethod, refund_status: RefundStatus) -> String {
+        match refund_status {
+            RefundStatus::No => match pay_method {
+                PayMethod::Unknown => "未支付".to_string(),
+                PayMethod::AliPay => "支付宝".to_string(),
+                PayMethod::Wechat => "微信支付".to_string(),
+                PayMethod::GooglePay => "Google支付".to_string(),
+                PayMethod::PayPal => "PayPal".to_string(),
+            },
+            RefundStatus::Fail => "退款失败".to_string(),
+            RefundStatus::Yes => "退款成功".to_string(),
+            RefundStatus::Waiting => "退款中".to_string(),
+            RefundStatus::AlreadyApplied => "已申请退款，等待审核".to_string(),
+        }
     }
 }

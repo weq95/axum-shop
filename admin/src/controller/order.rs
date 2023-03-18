@@ -1,15 +1,15 @@
 use std::collections::HashMap;
 
-use axum::extract::Path;
+use axum::extract::{Path, Query};
 use axum::response::IntoResponse;
 use axum::{Extension, Json};
 use serde_json::json;
 use validator::Validate;
 
-use common::error::format_errors;
+use common::error::{format_errors, ApiResult};
 use common::jwt::Claims;
 use common::order::ReqCreateOrder;
-use common::{ApiResponse, Pagination};
+use common::{ApiResponse, PagePer, Pagination};
 
 use crate::models::address::UserAddress;
 use crate::models::order_items::OrderItems;
@@ -20,7 +20,17 @@ pub struct OrderController;
 
 impl OrderController {
     // 订单列表
-    pub async fn index() -> impl IntoResponse {}
+    pub async fn index(
+        Query(page_per): Query<PagePer>,
+        Extension(user): Extension<Claims>,
+        Query(inner): Query<HashMap<String, serde_json::Value>>,
+    ) -> impl IntoResponse {
+        let mut pagination = Pagination::new(vec![], page_per);
+        match Orders::index(user.id, inner, &mut pagination).await {
+            Ok(()) => ApiResponse::response(Some(pagination)).json(),
+            Err(e) => ApiResponse::fail_msg(e.to_string()).json(),
+        }
+    }
 
     // 订单详情
     pub async fn get(Path(id): Path<i64>, Extension(user): Extension<Claims>) -> impl IntoResponse {
@@ -94,7 +104,7 @@ impl OrderController {
             Err(_err) => return ApiResponse::fail_msg("收获地址未找到".to_string()).json(),
         };
 
-        let mut order_items: HashMap<i64, _> = HashMap::new();
+        let mut order_items: HashMap<i64, HashMap<String, serde_json::Value>> = HashMap::new();
         let mut total_money = 0i64;
         if let Some(order) = &inner.products {
             for (idx, item) in order.iter().enumerate() {
@@ -118,14 +128,30 @@ impl OrderController {
                         total_money += sku.price;
                         order_items.insert(
                             sku.product_id,
-                            OrderItems::generate_sku(
-                                sku.id,
-                                sku.price,
-                                item.amount.unwrap() as i16,
-                                sku.title.clone(),
-                                sku.descr.clone(),
-                            )
-                            .await,
+                            //商品sku相关信息
+                            HashMap::from([
+                                ("sku_id".to_string(), serde_json::to_value(sku.id).unwrap()),
+                                (
+                                    "title".to_string(),
+                                    serde_json::to_value(sku.title.clone()).unwrap(),
+                                ),
+                                (
+                                    "descr".to_string(),
+                                    serde_json::to_value(sku.descr.clone()).unwrap(),
+                                ),
+                                (
+                                    "amount".to_string(),
+                                    serde_json::to_value(item.amount.unwrap()).unwrap(),
+                                ),
+                                (
+                                    "price".to_string(),
+                                    serde_json::to_value(sku.price).unwrap(),
+                                ),
+                                (
+                                    "picture".to_string(),
+                                    serde_json::to_value(sku.picture.clone()).unwrap(),
+                                ),
+                            ]),
                         );
                     }
                     None => {

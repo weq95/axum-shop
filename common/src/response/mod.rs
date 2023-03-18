@@ -126,23 +126,24 @@ pub struct Pagination<T> {
 
 #[derive(Deserialize)]
 pub struct PagePer {
+    #[serde(default = "default_page")]
     page: usize,
+    #[serde(default = "default_per_page")]
     per_page: usize,
 }
 
-impl Default for PagePer {
-    fn default() -> Self {
-        Self {
-            page: 1,
-            per_page: 30,
-        }
-    }
+// 默认页
+fn default_page() -> usize {
+    1
+}
+
+// 默认页大小
+fn default_per_page() -> usize {
+    30
 }
 
 impl<T> Pagination<T> {
-    pub fn new(result: Vec<T>, page_per: Option<PagePer>) -> Self {
-        let page_per = page_per.unwrap_or_default();
-
+    pub fn new(result: Vec<T>, page_per: PagePer) -> Self {
         Pagination {
             data: Some(Box::new(result)),
             page: page_per.page,
@@ -195,12 +196,12 @@ impl<T> Pagination<T> {
         None
     }
 
-    pub fn offset(&self) -> usize {
-        (self.page - 1) * self.per_page
+    pub fn offset(&self) -> i32 {
+        ((self.page - 1) * self.per_page) as i32
     }
 
-    pub fn limit(&self) -> usize {
-        self.per_page
+    pub fn limit(&self) -> i32 {
+        self.per_page as i32
     }
 
     /// 添加数据

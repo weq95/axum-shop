@@ -20,7 +20,7 @@ use common::{
 
 use crate::models::cart_items::CartItems;
 use crate::models::user::Admin;
-use crate::{get_pager, AppState};
+use crate::AppState;
 
 pub struct AdminController;
 
@@ -135,9 +135,9 @@ impl AdminController {
     /// 用户列表
     pub async fn lists(
         Query(params): Query<serde_json::Value>,
-        page_per: Option<Query<PagePer>>,
+        Query(page_per): Query<PagePer>,
     ) -> impl IntoResponse {
-        let mut pagination = Pagination::new(vec![], get_pager(page_per));
+        let mut pagination = Pagination::new(vec![], page_per);
 
         match Admin::lists(&mut pagination, &params).await {
             Ok(()) => ApiResponse::response(Some(pagination)).json(),
@@ -178,11 +178,11 @@ impl AdminController {
 
     /// 购物车列表
     pub async fn carts(
-        page_per: Option<Query<PagePer>>,
+        Query(page_per): Query<PagePer>,
         Extension(user): Extension<Claims>,
     ) -> impl IntoResponse {
         let mut pagination: Pagination<HashMap<String, serde_json::Value>> =
-            Pagination::new(vec![], get_pager(page_per));
+            Pagination::new(vec![], page_per);
 
         match Admin::cart_items(user.id, &mut pagination).await {
             Ok(()) => ApiResponse::response(Some(pagination)).json(),

@@ -11,7 +11,6 @@ use validator::ValidationError;
 
 use common::{ApiResponse, PagePer, Pagination};
 
-use crate::get_pager;
 use crate::models::cart_items::CartItems;
 use crate::models::favorite_products::FavoriteProducts;
 use crate::models::product_skus::ProductSku;
@@ -22,10 +21,10 @@ pub struct ProductController;
 impl ProductController {
     /// 商品列表
     pub async fn products(
-        page_per: Option<Query<PagePer>>,
+        Query(page_per): Query<PagePer>,
         Query(payload): Query<HashMap<String, String>>,
     ) -> impl IntoResponse {
-        let mut pagination: Pagination<Product> = Pagination::new(vec![], get_pager(page_per));
+        let mut pagination: Pagination<Product> = Pagination::new(vec![], page_per);
 
         match Product::products(payload, &mut pagination).await {
             Ok(()) => ApiResponse::response(Some(pagination)).json(),
