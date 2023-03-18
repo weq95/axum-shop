@@ -25,7 +25,6 @@ impl ProductController {
         page_per: Option<Query<PagePer>>,
         Query(payload): Query<HashMap<String, String>>,
     ) -> impl IntoResponse {
-        // let pager = if let Some(Query(a)) = page_per { Some(a) } else { None };
         let mut pagination: Pagination<Product> = Pagination::new(vec![], get_pager(page_per));
 
         match Product::products(payload, &mut pagination).await {

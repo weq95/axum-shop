@@ -42,8 +42,9 @@ impl OrderItems {
         for (product_id, sku) in items.iter() {
             sql_builder.push_str(format!(" (${}, ${}, ${}),", idx, idx + 1, idx + 2).as_str());
             idx += 2;
-            arg_builder.add(product_id);
+
             arg_builder.add(order_id);
+            arg_builder.add(product_id);
             arg_builder.add(json!(sku));
         }
 

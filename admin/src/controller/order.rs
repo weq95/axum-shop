@@ -39,7 +39,7 @@ impl OrderController {
         "no": order.no,
         "user_id": order.user_id,
         "address": order.address,
-        "total_amount":order.total_amount.0,
+        "total_amount":order.total_amount.0/100,
         "remark": order.remark,
         "paid_at": order.paid_at,
         "pay_method": Into::<i16>::into(order.pay_method),
