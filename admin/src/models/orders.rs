@@ -7,7 +7,7 @@ use sqlx::Row;
 use common::error::{ApiError, ApiResult};
 use common::Pagination;
 
-use crate::models::order_items::OrderItems;
+use crate::models::order_items::{ItemProductSku, OrderItems};
 
 #[derive(Debug, sqlx::FromRow)]
 pub struct Orders {
@@ -117,7 +117,7 @@ impl Orders {
         total_money: i64,
         address: sqlx::types::Json<HashMap<String, serde_json::Value>>,
         remark: String,
-        order_items: HashMap<i64, HashMap<String, serde_json::Value>>,
+        order_items: HashMap<i64, ItemProductSku>,
     ) -> ApiResult<i64> {
         let mut tx = common::postgres().await.begin().await?;
         let order_id = sqlx::query(
@@ -175,7 +175,7 @@ impl Orders {
 
         sql.push_str(" order by created_at desc limit $2 offset $3");
 
-        let result = sqlx::query(&*sql)
+        let mut result = sqlx::query(&*sql)
             .bind(user_id)
             .bind(pagination.limit())
             .bind(pagination.offset())
@@ -211,6 +211,15 @@ impl Orders {
             .fetch_one(common::postgres().await)
             .await?
             .get::<i64, _>("total");
+        let items = OrderItems::items(order_ids).await?;
+
+        for val in result.iter_mut() {
+            let order_id = val.get("id").unwrap().as_i64().unwrap();
+            if let Some(item) = items.get(&order_id) {
+                val.insert("items".to_string(), json!(item));
+            }
+        }
+
         pagination.set_total(total as usize);
         pagination.set_data(result);
 

@@ -19,10 +19,20 @@ pub struct OrderItems {
     pub updated_at: chrono::NaiveDateTime,
 }
 
+#[derive(sqlx::FromRow, Serialize, Deserialize)]
+pub struct ItemProductSku {
+    pub sku_id: i64,
+    pub title: String,
+    pub descr: String,
+    pub amount: i16,
+    pub price: i64,
+    pub picture: String,
+}
+
 impl OrderItems {
     pub async fn create(
         order_id: i64,
-        items: HashMap<i64, HashMap<String, serde_json::Value>>,
+        items: HashMap<i64, ItemProductSku>,
         tx: &mut Transaction<'_, Postgres>,
     ) -> ApiResult<bool> {
         let item_len = &items.len();
@@ -60,6 +70,40 @@ impl OrderItems {
                 .await?;
 
         Ok(result)
+    }
+
+    // 订单列表详情
+    pub async fn items(
+        order_ids: Vec<i64>,
+    ) -> ApiResult<HashMap<i64, HashMap<String, serde_json::Value>>> {
+        let item_result: Vec<OrderItems> =
+            sqlx::query_as("select * from order_items where order_id = any($1)")
+                .bind(order_ids)
+                .fetch_all(common::postgres().await)
+                .await?;
+
+        let item_result = item_result
+            .iter()
+            .map(|row| {
+                HashMap::from([
+                    ("id".to_string(), serde_json::to_value(row.id).unwrap()),
+                    (
+                        "order_id".to_string(),
+                        serde_json::to_value(row.order_id).unwrap(),
+                    ),
+                    (
+                        "product_sku".to_string(),
+                        serde_json::to_value(row.product_sku.clone()).unwrap(),
+                    ),
+                ])
+            })
+            .map(|row| {
+                let order_id = row.get("order_id").unwrap().as_i64().unwrap();
+                (order_id, row)
+            })
+            .collect::<HashMap<i64, HashMap<String, serde_json::Value>>>();
+
+        Ok(item_result)
     }
 
     // 删除字订单详情

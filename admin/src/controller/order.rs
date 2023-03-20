@@ -12,7 +12,7 @@ use common::order::ReqCreateOrder;
 use common::{ApiResponse, PagePer, Pagination};
 
 use crate::models::address::UserAddress;
-use crate::models::order_items::OrderItems;
+use crate::models::order_items::{ItemProductSku, OrderItems};
 use crate::models::orders::Orders;
 use crate::models::product_skus::ProductSku;
 
@@ -104,7 +104,7 @@ impl OrderController {
             Err(_err) => return ApiResponse::fail_msg("收获地址未找到".to_string()).json(),
         };
 
-        let mut order_items: HashMap<i64, HashMap<String, serde_json::Value>> = HashMap::new();
+        let mut order_items: HashMap<i64, ItemProductSku> = HashMap::new();
         let mut total_money = 0i64;
         if let Some(order) = &inner.products {
             for (idx, item) in order.iter().enumerate() {
@@ -129,29 +129,14 @@ impl OrderController {
                         order_items.insert(
                             sku.product_id,
                             //商品sku相关信息
-                            HashMap::from([
-                                ("sku_id".to_string(), serde_json::to_value(sku.id).unwrap()),
-                                (
-                                    "title".to_string(),
-                                    serde_json::to_value(sku.title.clone()).unwrap(),
-                                ),
-                                (
-                                    "descr".to_string(),
-                                    serde_json::to_value(sku.descr.clone()).unwrap(),
-                                ),
-                                (
-                                    "amount".to_string(),
-                                    serde_json::to_value(item.amount.unwrap()).unwrap(),
-                                ),
-                                (
-                                    "price".to_string(),
-                                    serde_json::to_value(sku.price).unwrap(),
-                                ),
-                                (
-                                    "picture".to_string(),
-                                    serde_json::to_value(sku.picture.clone()).unwrap(),
-                                ),
-                            ]),
+                            ItemProductSku {
+                                sku_id: sku.id,
+                                title: sku.title.clone(),
+                                descr: sku.descr.clone(),
+                                amount: item.amount.unwrap() as i16,
+                                price: sku.price,
+                                picture: sku.picture.clone(),
+                            },
                         );
                     }
                     None => {
