@@ -21,6 +21,7 @@ pub mod address;
 pub mod auth;
 pub mod order;
 pub mod products;
+pub mod rabbitmq;
 pub mod user;
 
 pub struct CommController;

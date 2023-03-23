@@ -2,6 +2,7 @@ use std::ops::Deref;
 use std::sync::Arc;
 
 use async_once::AsyncOnce;
+use axum::routing::get;
 use lazy_static::lazy_static;
 use regex::Regex;
 use serde::de::DeserializeOwned;
@@ -51,6 +52,11 @@ lazy_static! {
        crate::snowflake::SnowflakeIdWorker::new(1, 1).unwrap()
     });
 
+    // rabbitmq 链接器
+    pub static ref RABBITMQ: AsyncOnce<Arc<lapin::Connection>> = AsyncOnce::new(async{
+        let addr = "amqp://guest:guest@127.0.0.1:5672/%2f";
+        Arc::new(lapin::Connection::connect(addr, lapin::ConnectionProperties::default()).await.unwrap())
+    });
 }
 
 /// 解析任意数据数据
@@ -113,4 +119,8 @@ pub async fn get_pg_adapter() -> PgSqlAdapter {
 
 pub async fn snow_id() -> u128 {
     SNOW_ID_MANAGER.get().await.clone().next_id().unwrap()
+}
+
+pub async fn rabbit_mq() -> Arc<lapin::Connection> {
+    RABBITMQ.get().await.clone()
 }

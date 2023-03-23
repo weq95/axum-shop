@@ -24,3 +24,11 @@ redis:
   port:
   db:
   pool_size:
+
+#[rabbit-mq] 队列配置
+rabbit:
+  host:
+  port:
+  username:
+  password:
+  vhost:

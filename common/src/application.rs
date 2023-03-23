@@ -47,6 +47,7 @@ pub struct Application {
     pub update_frequency: u16,
     pub postgres: PostgresConfig,
     pub redis: RedisConfig,
+    pub rabbitmq: RabbitMQConfig,
 }
 
 #[async_trait]
@@ -85,6 +86,7 @@ impl Application {
             update_frequency: Self::analysis::<u16>("profile_refresh_rate", &cfg)?,
             postgres: Self::analysis::<PostgresConfig>("postgres", &cfg)?,
             redis: Self::analysis::<RedisConfig>("redis", &cfg)?,
+            rabbitmq: Self::analysis::<RabbitMQConfig>("rabbit", &cfg)?,
         })
     }
 
@@ -150,6 +152,16 @@ pub struct RedisConfig {
     pub port: u16,
     pub db: u8,
     pub pool_size: u32,
+}
+
+/// mq 配置参数
+#[derive(Serialize, Deserialize, Debug)]
+pub struct RabbitMQConfig {
+    pub host: String,
+    pub username: String,
+    pub password: String,
+    pub port: u16,
+    pub vhost: String,
 }
 
 #[cfg(test)]

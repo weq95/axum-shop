@@ -61,9 +61,8 @@ impl AddressController {
     }
 
     /// 用户收获地址列表
-    pub async fn list_address(Extension(_state): Extension<Arc<AppState>>) -> impl IntoResponse {
-        let userid = 1i64;
-        let data = UserAddress::list(userid).await.unwrap();
+    pub async fn list_address(Extension(user): Extension<Claims>) -> impl IntoResponse {
+        let data = UserAddress::list(user.id).await.unwrap();
         let mut result: Vec<ResAddress> = Vec::with_capacity(data.len());
 
         let mut ids = HashSet::new();

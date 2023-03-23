@@ -15,6 +15,9 @@ pub struct AppState {}
 
 #[tokio::main]
 async fn main() {
+    if std::env::var("RUST_LOG").is_err() {
+        std::env::set_var("RUST_LOG", "trace");
+    }
     tracing_subscriber::fmt()
         .with_max_level(tracing::Level::DEBUG)
         .finish()
@@ -26,6 +29,8 @@ async fn main() {
     let app_state = Arc::new(AppState {});
 
     let router = router::routers().await.layer(Extension(app_state));
+
+    controller::rabbitmq::init_rabbit().await;
 
     println!("admin-srv run at: {}", addr);
     axum::Server::bind(&addr)
