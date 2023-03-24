@@ -3,6 +3,7 @@ use std::net::SocketAddr;
 use std::sync::Arc;
 
 use axum::Extension;
+use log::info;
 use tracing_subscriber::util::SubscriberInitExt;
 
 mod controller;
@@ -16,7 +17,7 @@ pub struct AppState {}
 #[tokio::main]
 async fn main() {
     if std::env::var("RUST_LOG").is_err() {
-        std::env::set_var("RUST_LOG", "trace");
+        std::env::set_var("RUST_LOG", "TRACE");
     }
     tracing_subscriber::fmt()
         .with_max_level(tracing::Level::DEBUG)
@@ -32,7 +33,7 @@ async fn main() {
 
     controller::rabbitmq::init_rabbit().await;
 
-    println!("admin-srv run at: {}", addr);
+    info!("admin-srv run at: {}", addr);
     axum::Server::bind(&addr)
         .serve(router.into_make_service())
         .await

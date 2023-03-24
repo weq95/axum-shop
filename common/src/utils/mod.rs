@@ -54,7 +54,7 @@ lazy_static! {
 
     // rabbitmq 链接器
     pub static ref RABBITMQ: AsyncOnce<Arc<lapin::Connection>> = AsyncOnce::new(async{
-        let addr = "amqp://guest:guest@127.0.0.1:5672/%2f";
+        let addr = "amqp://127.0.0.1:5672/%2f";
         Arc::new(lapin::Connection::connect(addr, lapin::ConnectionProperties::default()).await.unwrap())
     });
 }
