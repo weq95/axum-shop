@@ -13,12 +13,8 @@ lazy_static! {
         // redis|rediss://[[<username>]:<password>@]<host>[:<port>][/<database>]
 
         let cfg = &crate::application_config().await.redis;
-        let dns = format!("redis://{}:{}@{}:{}/{}",
-        cfg.username.clone(),
-        cfg.password.clone(),
-        cfg.host.clone(),
-        cfg.port,
-        cfg.db);
+        let dns = format!("{}://{}:{}@{}:{}/{}",
+            cfg.scheme,cfg.username,cfg.password,cfg.host,cfg.port,cfg.db);
 
        let manager = RedisConnectionManager::new(dns).unwrap();
        r2d2::Pool::builder().max_size(cfg.pool_size).build(manager).unwrap()

@@ -112,7 +112,7 @@ pub async fn init_rabbit() {
     // 开始生产订单
     tokio::spawn(async move {
         println!("5. 开始生产订单");
-        for i in 100..200 {
+        for i in 100..120 {
             let time_now_int = Utc::now().timestamp() as u64;
             let order = Order {
                 id: i,

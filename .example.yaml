@@ -18,6 +18,7 @@ postgres:
 
 #[redis] 数据库配置
 redis:
+  scheme:
   host:
   username:
   password:
@@ -27,8 +28,9 @@ redis:
 
 #[rabbit-mq] 队列配置
 rabbit:
+  scheme:
   host:
   port:
   username:
   password:
-  vhost:
+  vhost: %2f

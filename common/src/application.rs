@@ -146,6 +146,7 @@ pub struct PostgresConfig {
 /// redis 数据库配置参数
 #[derive(Serialize, Deserialize, Debug)]
 pub struct RedisConfig {
+    pub scheme: String,
     pub host: String,
     pub username: String,
     pub password: String,
@@ -157,6 +158,7 @@ pub struct RedisConfig {
 /// mq 配置参数
 #[derive(Serialize, Deserialize, Debug)]
 pub struct RabbitMQConfig {
+    pub scheme: String,
     pub host: String,
     pub username: String,
     pub password: String,
