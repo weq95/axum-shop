@@ -6,7 +6,7 @@ use axum::{Extension, Json};
 use serde_json::json;
 use validator::Validate;
 
-use common::error::{format_errors, ApiResult};
+use common::error::format_errors;
 use common::jwt::Claims;
 use common::order::ReqCreateOrder;
 use common::{ApiResponse, PagePer, Pagination};

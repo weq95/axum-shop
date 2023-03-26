@@ -1,6 +1,5 @@
 use std::ops::DerefMut;
 
-use axum::extract::Query;
 use axum::{
     body::Body,
     extract::{Multipart, Path},
@@ -14,14 +13,13 @@ use tokio::io::AsyncWriteExt;
 
 use common::error::{ApiError, ApiResult};
 use common::jwt::{Claims, JWT};
-use common::{redis, ApiResponse, PagePer, SchoolJson, IMAGES_PATH};
+use common::{redis, ApiResponse, SchoolJson, IMAGES_PATH};
 pub use user::*;
 
 pub mod address;
 pub mod auth;
 pub mod order;
 pub mod products;
-pub mod rabbitmq;
 pub mod user;
 
 pub struct CommController;

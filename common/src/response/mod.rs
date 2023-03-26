@@ -6,8 +6,6 @@ use axum::{body::Body, response::Response};
 use http::response::Builder;
 use serde::{Deserialize, Serialize};
 
-use crate::parse_field;
-
 pub mod address;
 pub mod user;
 

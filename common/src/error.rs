@@ -170,6 +170,12 @@ impl From<regex::Error> for ApiError {
     }
 }
 
+impl From<lapin::Error> for ApiError {
+    fn from(value: lapin::Error) -> Self {
+        ApiError::Error(value.to_string())
+    }
+}
+
 struct ApiVisitor;
 
 impl<'de> Visitor<'de> for ApiVisitor {

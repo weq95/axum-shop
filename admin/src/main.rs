@@ -3,8 +3,8 @@ use std::net::SocketAddr;
 use std::sync::Arc;
 
 use axum::Extension;
-use log::info;
-use tracing_subscriber::util::SubscriberInitExt;
+use common::rabbitmq::RabbitMQDeadQueue;
+use tracing::info;
 
 mod controller;
 mod middleware;
@@ -16,13 +16,10 @@ pub struct AppState {}
 
 #[tokio::main]
 async fn main() {
-    if std::env::var("RUST_LOG").is_err() {
-        std::env::set_var("RUST_LOG", "TRACE");
-    }
-    tracing_subscriber::fmt()
-        .with_max_level(tracing::Level::DEBUG)
-        .finish()
-        .set_default();
+    let subscriber = tracing_subscriber::FmtSubscriber::builder()
+        .with_writer(std::io::stdout)
+        .finish();
+    tracing::subscriber::set_global_default(subscriber).unwrap();
 
     common::application_config().await;
     let addr = SocketAddr::from(([127, 0, 0, 1], 8081));
@@ -31,7 +28,7 @@ async fn main() {
 
     let router = router::routers().await.layer(Extension(app_state));
 
-    controller::rabbitmq::init_rabbit().await;
+    common::DEAD_QUEUE.get().await.clone().init().await;
 
     info!("admin-srv run at: {}", addr);
     axum::Server::bind(&addr)

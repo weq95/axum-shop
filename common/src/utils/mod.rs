@@ -2,7 +2,6 @@ use std::ops::Deref;
 use std::sync::Arc;
 
 use async_once::AsyncOnce;
-use axum::routing::get;
 use lazy_static::lazy_static;
 use regex::Regex;
 use serde::de::DeserializeOwned;
@@ -12,10 +11,12 @@ use url::form_urlencoded::{byte_serialize, parse};
 
 use crate::casbin::PgSqlAdapter;
 use crate::error::ApiResult;
+use crate::rabbitmq::{DlxOrder, RabbitMQDeadQueue};
 
 pub mod casbin;
 pub mod jwt;
 pub mod pwd;
+pub mod rabbitmq;
 pub mod redis;
 pub(crate) mod snowflake;
 
@@ -24,7 +25,7 @@ pub const IMAGES_PATH: &str = "./files/images/";
 
 lazy_static! {
     // pgsql 连接池
-    static ref PG_SQL: AsyncOnce<Arc<ConnPool>> = AsyncOnce::new(async {
+    pub static ref PG_SQL: AsyncOnce<Arc<ConnPool>> = AsyncOnce::new(async {
         let cfg = &crate::application_config().await.postgres;
         let dns: String = format!(
             "postgres://{}:{}@{}:{}/{}",
@@ -57,6 +58,11 @@ lazy_static! {
         let cfg = &crate::application_config().await.rabbitmq;
         let addr = format!("{}://{}:{}@{}:{}/{}",cfg.scheme,cfg.username,cfg.password,cfg.host,cfg.port,cfg.vhost);
         Arc::new(lapin::Connection::connect(addr.as_str(), lapin::ConnectionProperties::default()).await.unwrap())
+    });
+
+    // 死信队列
+    pub static ref DEAD_QUEUE: AsyncOnce<Arc<DlxOrder >> = AsyncOnce::new(async {
+        Arc::new(DlxOrder::new())
     });
 }
 
