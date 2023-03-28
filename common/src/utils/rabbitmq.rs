@@ -1,17 +1,18 @@
 use std::collections::{BTreeMap, HashMap};
 use std::fmt::Debug;
+use std::sync::Arc;
 
 use futures::StreamExt;
 use lapin::{
-    BasicProperties,
-    Channel,
-    ExchangeKind, options::{
+    options::{
         BasicAckOptions, BasicConsumeOptions, BasicPublishOptions, ExchangeDeclareOptions,
         QueueBindOptions, QueueDeclareOptions,
-    }, types::{AMQPValue, FieldTable},
+    },
+    types::{AMQPValue, FieldTable},
+    BasicProperties, Channel, ExchangeKind,
 };
-use serde::{Deserialize, Serialize};
 use serde::de::DeserializeOwned;
+use serde::{Deserialize, Serialize};
 use tracing::log::{error, info};
 use tracing_subscriber::util::SubscriberInitExt;
 
@@ -25,7 +26,10 @@ pub struct DlxOrder {
 }
 
 impl RabbitMQQueue for DlxOrder {
-    fn default() -> Self where Self: Sized {
+    fn default() -> Self
+    where
+        Self: Sized,
+    {
         todo!()
     }
     fn callback(&self, _data: Vec<u8>) {
@@ -58,9 +62,8 @@ impl RabbitMQQueue for DlxOrder {
 
 /// MQ 队列管理器
 pub struct MQPluginManager {
-    plugins: HashMap<&'static str, &'static Box<dyn RabbitMQQueue>>,
+    plugins: HashMap<&'static str, &'static Arc<Box<dyn RabbitMQQueue>>>,
 }
-
 
 impl MQPluginManager {
     pub(crate) fn new() -> Self {
@@ -70,26 +73,38 @@ impl MQPluginManager {
     }
 
     // 获取主驱动
-    pub fn get_mq_core(&mut self, queue_name: &str) -> Option<&Box<dyn RabbitMQQueue>> {
+    pub fn get_mq_core(&mut self, queue_name: &str) -> Option<Arc<Box<dyn RabbitMQQueue>>> {
         if let Some(&rabbit) = self.plugins.get(queue_name) {
-            return Some(rabbit);
+            return Some(rabbit.clone());
         }
 
-        info!("mq驱动未注册: time: {:?}, name: {}", std::time::SystemTime::now(), queue_name);
+        info!(
+            "mq驱动未注册: time: {:?}, name: {}",
+            std::time::SystemTime::now(),
+            queue_name
+        );
         None
     }
 
     // 添加队列驱动
-    pub fn add_plugin(&mut self, queue_name: &'static str, plugin: &'static Box<dyn RabbitMQQueue>) {
-        self.plugins.insert(queue_name.clone(), plugin);
+    pub fn add_plugin(
+        &mut self,
+        queue_name: &'static str,
+        plugin: &'static Arc<Box<dyn RabbitMQQueue>>,
+    ) {
+        self.plugins.insert(queue_name, plugin);
 
-        plugin.init();
+        tokio::spawn(async move{
+            plugin.init();
+        });
     }
 }
 
 #[axum::async_trait]
 pub trait RabbitMQQueue: Send + Sync {
-    fn default() -> Self where Self: Sized;
+    fn default() -> Self
+    where
+        Self: Sized;
 
     // consume 业务消费业务逻辑
     fn callback(&self, data: Vec<u8>);
@@ -101,7 +116,7 @@ pub trait RabbitMQQueue: Send + Sync {
     }
 
     // 初始化队列, 启动消费者
-    async fn init(&'static self) {
+    async fn init(&self) {
         self.init_queue().await.expect("init_queue: panic message");
 
         self.init_dlx_queue()
