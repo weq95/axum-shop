@@ -1,18 +1,19 @@
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, HashMap};
 use std::fmt::Debug;
 
 use futures::StreamExt;
 use lapin::{
-    options::{
+    BasicProperties,
+    Channel,
+    ExchangeKind, options::{
         BasicAckOptions, BasicConsumeOptions, BasicPublishOptions, ExchangeDeclareOptions,
         QueueBindOptions, QueueDeclareOptions,
-    },
-    types::{AMQPValue, FieldTable},
-    BasicProperties, Channel, ExchangeKind,
+    }, types::{AMQPValue, FieldTable},
 };
-use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
-use tracing::log::error;
+use serde::de::DeserializeOwned;
+use tracing::log::{error, info};
+use tracing_subscriber::util::SubscriberInitExt;
 
 use crate::error::ApiResult;
 
@@ -23,9 +24,19 @@ pub struct DlxOrder {
     pub ext_at: Option<chrono::NaiveDateTime>,
 }
 
-impl MQCallBack for DlxOrder {
-    fn callback(&mut self) {
+impl RabbitMQQueue for DlxOrder {
+    fn default() -> Self where Self: Sized {
+        todo!()
+    }
+    fn callback(&self, _data: Vec<u8>) {
+        // let message = String::from_utf8_lossy(&delivery.body);
+        // let callback: Box<dyn MQCallBack> = Box::new(MyCallback::from_message(message.as_ref()).unwrap());
+        // 调用 callback 的方法进行处理
         println!("订单未支付：{:#?}", self);
+    }
+
+    fn to_string(&self) -> String {
+        serde_json::to_string(self).unwrap()
     }
 
     fn queue(&self) -> String {
@@ -45,22 +56,60 @@ impl MQCallBack for DlxOrder {
     }
 }
 
-impl RabbitMQDeadQueue for DlxOrder {
-    type Output = Self;
+/// MQ 队列管理器
+pub struct MQPluginManager {
+    plugins: HashMap<&'static str, &'static Box<dyn RabbitMQQueue>>,
+}
 
-    fn new() -> Self::Output {
-        DlxOrder {
-            order_id: 0,
-            created_at: None,
-            ext_at: None,
+
+impl MQPluginManager {
+    pub(crate) fn new() -> Self {
+        MQPluginManager {
+            plugins: HashMap::new(),
         }
+    }
+
+    // 获取主驱动
+    pub fn get_mq_core(&mut self, queue_name: &str) -> Option<&Box<dyn RabbitMQQueue>> {
+        if let Some(&rabbit) = self.plugins.get(queue_name) {
+            return Some(rabbit);
+        }
+
+        info!("mq驱动未注册: time: {:?}, name: {}", std::time::SystemTime::now(), queue_name);
+        None
+    }
+
+    // 添加队列驱动
+    pub fn add_plugin(&mut self, queue_name: &'static str, plugin: &'static Box<dyn RabbitMQQueue>) {
+        self.plugins.insert(queue_name.clone(), plugin);
+
+        plugin.init();
     }
 }
 
 #[axum::async_trait]
-pub trait MQCallBack {
-    // 超时业务逻辑
-    fn callback(&mut self);
+pub trait RabbitMQQueue: Send + Sync {
+    fn default() -> Self where Self: Sized;
+
+    // consume 业务消费业务逻辑
+    fn callback(&self, data: Vec<u8>);
+
+    fn to_string(&self) -> String;
+
+    fn plugin(&self) -> (&'static str, &'static Box<dyn RabbitMQQueue>) {
+        todo!()
+    }
+
+    // 初始化队列, 启动消费者
+    async fn init(&'static self) {
+        self.init_queue().await.expect("init_queue: panic message");
+
+        self.init_dlx_queue()
+            .await
+            .expect("start_dlx_queue: panic message");
+
+        self.consume().await;
+    }
 
     // 队列名称
     fn queue(&self) -> String {
@@ -92,43 +141,20 @@ pub trait MQCallBack {
         format!("dlx-{}", self.router_key().clone())
     }
 
-    // 过期时间： 默认30分钟 30 * 60 * 1000
+    // 单条消息过期时间： 默认30分钟 30 * 60 * 1000
     fn expiration(&self) -> usize {
         1800000
     }
-}
 
-#[axum::async_trait]
-pub trait RabbitMQDeadQueue:
-    MQCallBack + DeserializeOwned + Serialize + Send + Sync + 'static
-{
-    type Output;
-
-    fn new() -> Self::Output;
-
-    async fn init(mut self) {
-        self.init_normal_queue()
-            .await
-            .expect("init_normal_queue: panic message");
-        self.init_dead_queue()
-            .await
-            .expect("init_dead_queue: panic message");
-
-        tokio::spawn(async move {
-            self.consume().await.expect("consume: panic message");
-        });
-    }
-
-    async fn self_data(&self) -> String {
-        serde_json::to_string(&self.clone()).unwrap()
-    }
-
+    // 获取 mq channel
     async fn channel(&self) -> Channel {
-        crate::rabbit_mq().await.create_channel().await.unwrap()
+        let rabbit = crate::rabbit_mq().await.clone();
+
+        rabbit.create_channel().await.unwrap()
     }
 
     // 普通队列
-    async fn init_normal_queue(&self) -> ApiResult<()> {
+    async fn init_queue(&self) -> ApiResult<()> {
         let channel = self.channel().await;
         channel
             .exchange_declare(
@@ -171,8 +197,8 @@ pub trait RabbitMQDeadQueue:
         Ok(())
     }
 
-    // 死信队列
-    async fn init_dead_queue(&self) -> ApiResult<()> {
+    // 死信队列, 不需要时请实现空接口,系统初始化会调用此函数
+    async fn init_dlx_queue(&self) -> ApiResult<()> {
         let channel = self.channel().await;
 
         channel
@@ -206,7 +232,7 @@ pub trait RabbitMQDeadQueue:
     }
 
     // 生产者
-    async fn produce(&self) -> ApiResult<()> {
+    async fn produce(&self, result: Box<dyn RabbitMQQueue>) -> ApiResult<()> {
         let properties = BasicProperties::default()
             .with_content_type("application/json".into())
             .with_priority(0)
@@ -219,7 +245,7 @@ pub trait RabbitMQDeadQueue:
                 self.exchange().as_str(),
                 self.router_key().as_str(),
                 BasicPublishOptions::default(),
-                self.self_data().await.as_bytes(),
+                result.to_string().as_bytes(),
                 properties,
             )
             .await
@@ -229,7 +255,7 @@ pub trait RabbitMQDeadQueue:
     }
 
     //消费者
-    async fn consume(&mut self) -> ApiResult<()> {
+    async fn consume(&self) {
         let mut consumer = self
             .channel()
             .await
@@ -246,9 +272,8 @@ pub trait RabbitMQDeadQueue:
             match message {
                 Ok(delivery) => {
                     delivery.ack(BasicAckOptions::default()).await.unwrap();
-                    let mut payload: Self =
-                        serde_json::from_str(&String::from_utf8(delivery.data).unwrap()).unwrap();
-                    payload.callback();
+
+                    self.callback(delivery.data);
                 }
                 Err(e) => println!("死信队列消费信息错误: {}", e),
             }
@@ -259,7 +284,5 @@ pub trait RabbitMQDeadQueue:
             .format("%Y-%m-%d %H:%M:%S")
             .to_string();
         error!("消费信息失败：「{}」", time_str);
-
-        Ok(())
     }
 }

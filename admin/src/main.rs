@@ -3,7 +3,6 @@ use std::net::SocketAddr;
 use std::sync::Arc;
 
 use axum::Extension;
-use common::rabbitmq::RabbitMQDeadQueue;
 use tracing::info;
 
 mod controller;
@@ -27,8 +26,6 @@ async fn main() {
     let app_state = Arc::new(AppState {});
 
     let router = router::routers().await.layer(Extension(app_state));
-
-    common::DEAD_QUEUE.get().await.clone().init().await;
 
     info!("admin-srv run at: {}", addr);
     axum::Server::bind(&addr)
