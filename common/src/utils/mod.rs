@@ -60,11 +60,12 @@ lazy_static! {
         Arc::new(lapin::Connection::connect(addr.as_str(), lapin::ConnectionProperties::default()).await.unwrap())
     });
 
-    // mq队列管理器
-    pub static ref DEAD_QUEUE: AsyncOnce<Arc<MQPluginManager>> = AsyncOnce::new(async {
+    // mq 队列管理器
+    pub static ref MQ_MANAGER: AsyncOnce<Arc<MQPluginManager>> = AsyncOnce::new(async {
         let mut rabbit = MQPluginManager::new();
 
         rabbit.register_plugin();
+        println!("------------------------ mq start--------------------");
         Arc::new(rabbit)
     });
 }

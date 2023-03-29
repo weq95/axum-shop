@@ -1,18 +1,20 @@
-use std::ops::DerefMut;
+use std::ops::{Add, DerefMut};
 
 use axum::{
     body::Body,
     extract::{Multipart, Path},
     http::Request,
     response::IntoResponse,
-    Json,
+    Extension, Json,
 };
 use http::StatusCode;
 use serde_json::json;
 use tokio::io::AsyncWriteExt;
+use tracing::info;
 
 use common::error::{ApiError, ApiResult};
 use common::jwt::{Claims, JWT};
+use common::rabbitmq::RabbitMQQueue;
 use common::{redis, ApiResponse, SchoolJson, IMAGES_PATH};
 pub use user::*;
 
@@ -148,5 +150,34 @@ impl CommController {
         }
 
         Ok(path)
+    }
+
+    // 死信队列测试接口
+    pub async fn rabbit_mq_dlx_test(
+        Path(order_id): Path<i64>,
+        Extension(user): Extension<Claims>,
+    ) -> impl IntoResponse {
+        let mut time_now = chrono::Local::now();
+        let order = Box::new(common::rabbitmq::DlxOrder {
+            order_id,
+            created_at: Some(time_now.naive_local()),
+            ext_at: Some(time_now.add(chrono::Duration::seconds(30)).naive_local()),
+        });
+
+        match order.produce().await {
+            Ok(()) => ApiResponse::response(Some(json!({
+                "status": true,
+            })))
+            .json(),
+            Err(e) => ApiResponse::fail_msg("发送失败".to_string()).json(),
+        }
+    }
+
+    // 普通队列测试
+    pub async fn rabbit_mq_test(
+        Path(id): Path<i64>,
+        Extension(user): Extension<Claims>,
+    ) -> impl IntoResponse {
+        todo!()
     }
 }

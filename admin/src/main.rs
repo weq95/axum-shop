@@ -25,6 +25,7 @@ async fn main() {
 
     let app_state = Arc::new(AppState {});
 
+    common::MQ_MANAGER.get().await;
     let router = router::routers().await.layer(Extension(app_state));
 
     info!("admin-srv run at: {}", addr);

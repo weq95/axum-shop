@@ -3,46 +3,154 @@ use std::fmt::Debug;
 use std::sync::Arc;
 
 use futures::StreamExt;
+use http_body::Body;
 use lapin::{
-    options::{
+    BasicProperties,
+    Channel,
+    ExchangeKind, options::{
         BasicAckOptions, BasicConsumeOptions, BasicPublishOptions, ExchangeDeclareOptions,
         QueueBindOptions, QueueDeclareOptions,
-    },
-    types::{AMQPValue, FieldTable},
-    BasicProperties, Channel, ExchangeKind,
+    }, types::{AMQPValue, FieldTable},
 };
 use serde::{Deserialize, Serialize};
-use tracing::log::{error, info};
+use tracing::{error, info, warn};
 
-use crate::error::ApiResult;
-
-#[derive(Debug, Serialize, Deserialize, Copy, Clone)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct DlxOrder {
     pub order_id: i64,
     pub created_at: Option<chrono::NaiveDateTime>,
     pub ext_at: Option<chrono::NaiveDateTime>,
 }
 
+#[derive(Debug, Serialize, Deserialize)]
+pub struct OrdinaryUser {
+    pub id: i64,
+    pub name: String,
+    pub age: u8,
+    pub school: String,
+}
+
+/*impl RabbitMQQueue for OrdinaryUser {
+    fn default() -> Self where Self: Sized {
+        OrdinaryUser{
+            id: 0,
+            name: "".to_string(),
+            age: 0,
+            school: "".to_string(),
+        }
+    }
+
+    fn callback(&self, data: Vec<u8>) {
+        let data: Self = serde_json::from_slice(data.as_slice()).unwrap();
+        println!("用户信息：{:#?}", data);
+    }
+
+    fn to_string(&self) -> String {
+        self.to_string()
+    }
+
+    fn queue(&self) -> &'static str {
+        "user-queue"
+    }
+
+    fn exchange(&self) -> &'static str {
+        "user-exchange"
+    }
+
+    fn router_key(&self) -> &'static str {
+        "user-router-key"
+    }
+
+    fn expiration(&self) -> usize {
+        30000
+    }
+
+    async fn init_queue(&self) -> lapin::Result<()> {
+        let channel = self.channel().await?;
+
+        channel.queue_declare(
+            self.queue(),
+            QueueDeclareOptions::default(),
+            FieldTable::default(),
+        ).await?;
+
+        Ok(())
+    }
+
+    async fn init_dlx_queue(&self) -> lapin::Result<()> {
+        Ok(())
+    }
+
+    async fn produce(&self) -> lapin::Result<()> {
+        let channel = self.channel().await?;
+
+        let _queue = channel
+            .queue_declare(
+                self.queue(),
+                QueueDeclareOptions::default(),
+                FieldTable::default(),
+            )
+            .await?;
+
+        channel.basic_publish(
+            self.exchange(),
+            self.router_key(),
+            BasicPublishOptions::default(),
+            self.to_string().as_bytes(),
+            BasicProperties::default(),
+        ).await?.await?;
+
+        Ok(())
+    }
+
+    async fn consume(&self) -> lapin::Result<()> {
+        let channel = self.channel().await?;
+
+        let mut consumer = channel.basic_consume(
+            self.queue(),
+            "my_consumer",
+            BasicConsumeOptions::default(),
+            FieldTable::default(),
+        ).await?;
+
+
+        while let Some(message) = consumer.next().await {
+            match message {
+                Ok(delivery) => {
+                    delivery.ack(BasicAckOptions::default()).await;
+
+                    self.callback(delivery.data)
+                }
+                Err(e) => {
+                    error!(format!( " 消息消费错误: {}", e));
+                    break;
+                }
+            }
+        }
+
+        Ok(())
+    }
+}*/
+
+
 impl RabbitMQQueue for DlxOrder {
     fn default() -> Self
-    where
-        Self: Sized,
+        where
+            Self: Sized,
     {
-        DlxOrder {
+        DlxOrder{
             order_id: 0,
             created_at: None,
             ext_at: None,
         }
     }
     fn callback(&self, _data: Vec<u8>) {
-        // let message = String::from_utf8_lossy(&delivery.body);
-        // let callback: Box<dyn MQCallBack> = Box::new(MyCallback::from_message(message.as_ref()).unwrap());
-        // 调用 callback 的方法进行处理
-        println!("订单未支付：{:#?}", self);
+        let data: Self = serde_json::from_slice(_data.as_slice()).unwrap();
+        println!("订单未支付：{:#?}", data);
     }
 
     fn to_string(&self) -> String {
-        serde_json::to_string(self).unwrap()
+        self.to_string()
     }
 
     fn queue(&self) -> &'static str {
@@ -74,23 +182,10 @@ impl MQPluginManager {
         }
     }
 
-    // 获取主驱动
-    pub fn get_mq_core(&mut self, key: &str) -> Option<Arc<Box<dyn RabbitMQQueue>>> {
-        if let Some(rabbit) = self.plugins.get(key) {
-            return Some(rabbit.clone());
-        }
-
-        info!(
-            "mq驱动未注册: time: {:?}, name: {}",
-            std::time::SystemTime::now(),
-            key
-        );
-        None
-    }
-
     // 注册队列
     pub fn register_plugin(&mut self) {
-        let dlx_order = Box::new(DlxOrder::default());
+        let dlx_order = Box::new(<DlxOrder as RabbitMQQueue>::default());
+
         let plugins: [(&'static str, Box<dyn RabbitMQQueue>); 1] = [(dlx_order.queue(), dlx_order)];
 
         for (key, plugin) in plugins {
@@ -124,8 +219,8 @@ impl MQPluginManager {
 #[axum::async_trait]
 pub trait RabbitMQQueue: Send + Sync {
     fn default() -> Self
-    where
-        Self: Sized;
+        where
+            Self: Sized;
 
     // consume 业务消费业务逻辑
     fn callback(&self, data: Vec<u8>);
@@ -168,15 +263,16 @@ pub trait RabbitMQQueue: Send + Sync {
     }
 
     // 获取 mq channel
-    async fn channel(&self) -> Channel {
+    async fn channel(&self) -> lapin::Result<Channel> {
         let rabbit = crate::rabbit_mq().await.clone();
 
-        rabbit.create_channel().await.unwrap()
+        rabbit.create_channel().await
     }
 
     // 普通队列
-    async fn init_queue(&self) -> ApiResult<()> {
-        let channel = self.channel().await;
+    async fn init_queue(&self) -> lapin::Result<()> {
+        let channel = self.channel().await?;
+
         channel
             .exchange_declare(
                 self.exchange(),
@@ -219,8 +315,8 @@ pub trait RabbitMQQueue: Send + Sync {
     }
 
     // 死信队列, 不需要时请实现空接口,系统初始化会调用此函数
-    async fn init_dlx_queue(&self) -> ApiResult<()> {
-        let channel = self.channel().await;
+    async fn init_dlx_queue(&self) -> lapin::Result<()> {
+        let channel = self.channel().await?;
 
         channel
             .exchange_declare(
@@ -253,7 +349,7 @@ pub trait RabbitMQQueue: Send + Sync {
     }
 
     // 生产者
-    async fn produce(&self, result: Box<dyn RabbitMQQueue>) -> ApiResult<()> {
+    async fn produce(&self) -> lapin::Result<()> {
         let properties = BasicProperties::default()
             .with_content_type("application/json".into())
             .with_priority(0)
@@ -261,49 +357,47 @@ pub trait RabbitMQQueue: Send + Sync {
             .with_expiration(self.expiration().to_string().into()); // 设置过期时间
 
         self.channel()
-            .await
+            .await?
             .basic_publish(
                 self.exchange(),
                 self.router_key(),
                 BasicPublishOptions::default(),
-                result.to_string().as_bytes(),
+                self.to_string().as_bytes(),
                 properties,
             )
-            .await
-            .unwrap();
+            .await?;
 
         Ok(())
     }
 
     //消费者
-    async fn consume(&self) {
+    async fn consume(&self) -> lapin::Result<()> {
         let mut consumer = self
             .channel()
             .await
+            .map_err(|err| {
+                error!("mq 队列 未进行初始化, err: {}", err);
+                err
+            })?
             .basic_consume(
                 self.dlx_queue(),
                 "",
                 BasicConsumeOptions::default(),
                 FieldTable::default(),
             )
-            .await
-            .unwrap();
+            .await?;
 
         while let Some(message) = consumer.next().await {
             match message {
                 Ok(delivery) => {
-                    delivery.ack(BasicAckOptions::default()).await.unwrap();
+                    delivery.ack(BasicAckOptions::default()).await;
 
                     self.callback(delivery.data);
                 }
-                Err(e) => println!("死信队列消费信息错误: {}", e),
+                Err(e) => println!("消费信息错误: {}", e),
             }
         }
 
-        let time_str = chrono::Utc::now()
-            .naive_utc()
-            .format("%Y-%m-%d %H:%M:%S")
-            .to_string();
-        error!("消费信息失败：「{}」", time_str);
+        Ok(())
     }
 }
