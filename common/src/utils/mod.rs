@@ -7,12 +7,11 @@ use regex::Regex;
 use serde::de::DeserializeOwned;
 use serde_json::Value;
 use sqlx::postgres::PgPoolOptions;
-use tracing_subscriber::util::SubscriberInitExt;
 use url::form_urlencoded::{byte_serialize, parse};
 
 use crate::casbin::PgSqlAdapter;
 use crate::error::ApiResult;
-use crate::rabbitmq::{DlxOrder, MQPluginManager, RabbitMQQueue};
+use crate::rabbitmq::MQPluginManager;
 
 pub mod casbin;
 pub mod jwt;
@@ -61,13 +60,13 @@ lazy_static! {
         Arc::new(lapin::Connection::connect(addr.as_str(), lapin::ConnectionProperties::default()).await.unwrap())
     });
 
-    // 死信队列
-    /*pub static ref DEAD_QUEUE: AsyncOnce<Arc<MQPluginManager<Box<dyn RabbitMQQueue + 'static>>>> = AsyncOnce::new(async {
-        let mut rabbit = MQPluginManager::new(RabbitMQQueue::new());
+    // mq队列管理器
+    pub static ref DEAD_QUEUE: AsyncOnce<Arc<MQPluginManager>> = AsyncOnce::new(async {
+        let mut rabbit = MQPluginManager::new();
 
-        rabbit.add_plugin();
+        rabbit.register_plugin();
         Arc::new(rabbit)
-    });*/
+    });
 }
 
 /// 解析任意数据数据

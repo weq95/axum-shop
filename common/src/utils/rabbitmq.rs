@@ -11,10 +11,8 @@ use lapin::{
     types::{AMQPValue, FieldTable},
     BasicProperties, Channel, ExchangeKind,
 };
-use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
 use tracing::log::{error, info};
-use tracing_subscriber::util::SubscriberInitExt;
 
 use crate::error::ApiResult;
 
@@ -30,7 +28,11 @@ impl RabbitMQQueue for DlxOrder {
     where
         Self: Sized,
     {
-        todo!()
+        DlxOrder {
+            order_id: 0,
+            created_at: None,
+            ext_at: None,
+        }
     }
     fn callback(&self, _data: Vec<u8>) {
         // let message = String::from_utf8_lossy(&delivery.body);
@@ -43,16 +45,16 @@ impl RabbitMQQueue for DlxOrder {
         serde_json::to_string(self).unwrap()
     }
 
-    fn queue(&self) -> String {
-        "order-queue".to_string()
+    fn queue(&self) -> &'static str {
+        "order-queue"
     }
 
-    fn exchange(&self) -> String {
-        "order-exchange".to_string()
+    fn exchange(&self) -> &'static str {
+        "order-exchange"
     }
 
-    fn router_key(&self) -> String {
-        "order-router".to_string()
+    fn router_key(&self) -> &'static str {
+        "order-router"
     }
 
     fn expiration(&self) -> usize {
@@ -62,7 +64,7 @@ impl RabbitMQQueue for DlxOrder {
 
 /// MQ 队列管理器
 pub struct MQPluginManager {
-    plugins: HashMap<&'static str, &'static Arc<Box<dyn RabbitMQQueue>>>,
+    plugins: HashMap<&'static str, Arc<Box<dyn RabbitMQQueue>>>,
 }
 
 impl MQPluginManager {
@@ -73,29 +75,48 @@ impl MQPluginManager {
     }
 
     // 获取主驱动
-    pub fn get_mq_core(&mut self, queue_name: &str) -> Option<Arc<Box<dyn RabbitMQQueue>>> {
-        if let Some(&rabbit) = self.plugins.get(queue_name) {
+    pub fn get_mq_core(&mut self, key: &str) -> Option<Arc<Box<dyn RabbitMQQueue>>> {
+        if let Some(rabbit) = self.plugins.get(key) {
             return Some(rabbit.clone());
         }
 
         info!(
             "mq驱动未注册: time: {:?}, name: {}",
             std::time::SystemTime::now(),
-            queue_name
+            key
         );
         None
     }
 
-    // 添加队列驱动
-    pub fn add_plugin(
-        &mut self,
-        queue_name: &'static str,
-        plugin: &'static Arc<Box<dyn RabbitMQQueue>>,
-    ) {
-        self.plugins.insert(queue_name, plugin);
+    // 注册队列
+    pub fn register_plugin(&mut self) {
+        let dlx_order = Box::new(DlxOrder::default());
+        let plugins: [(&'static str, Box<dyn RabbitMQQueue>); 1] = [(dlx_order.queue(), dlx_order)];
 
-        tokio::spawn(async move{
-            plugin.init();
+        for (key, plugin) in plugins {
+            self.add_plugin(key, Arc::new(plugin))
+        }
+    }
+
+    // 添加队列驱动, auto: 初始化队列和启动消费端
+    pub fn add_plugin(&mut self, key: &'static str, plugin: Arc<Box<dyn RabbitMQQueue>>) {
+        if self.plugins.contains_key(key) {
+            return;
+        }
+        self.plugins.insert(key, plugin.clone());
+
+        tokio::spawn(async move {
+            if plugin.init_queue().await.is_err() {
+                error!("init_queue: 队列启动失败");
+                return;
+            }
+
+            if plugin.init_dlx_queue().await.is_err() {
+                error!("init_dlx_queue: 死信队列启动失败");
+                return;
+            }
+
+            plugin.consume().await;
         });
     }
 }
@@ -111,49 +132,34 @@ pub trait RabbitMQQueue: Send + Sync {
 
     fn to_string(&self) -> String;
 
-    fn plugin(&self) -> (&'static str, &'static Box<dyn RabbitMQQueue>) {
-        todo!()
-    }
-
-    // 初始化队列, 启动消费者
-    async fn init(&self) {
-        self.init_queue().await.expect("init_queue: panic message");
-
-        self.init_dlx_queue()
-            .await
-            .expect("start_dlx_queue: panic message");
-
-        self.consume().await;
-    }
-
     // 队列名称
-    fn queue(&self) -> String {
-        "normal-queue".to_string()
+    fn queue(&self) -> &'static str {
+        "normal-queue"
     }
 
     // 交换机名称
-    fn exchange(&self) -> String {
-        "normal-exchange".to_string()
+    fn exchange(&self) -> &'static str {
+        "normal-exchange"
     }
 
     // 路由名称
-    fn router_key(&self) -> String {
-        "normal-router".to_string()
+    fn router_key(&self) -> &'static str {
+        "normal-router"
     }
 
     // 死信队列
-    fn dlx_queue(&self) -> String {
-        format!("dlx-{}", self.queue().clone())
+    fn dlx_queue(&self) -> &'static str {
+        Box::leak(Box::new(format!("dlx-{}", self.queue())))
     }
 
     // 死信交换机
-    fn dlx_exchange(&self) -> String {
-        format!("dlx-{}", self.exchange().clone())
+    fn dlx_exchange(&self) -> &'static str {
+        Box::leak(Box::new(format!("dlx-{}", self.exchange())))
     }
 
     // 死信路由
-    fn dlx_router_key(&self) -> String {
-        format!("dlx-{}", self.router_key().clone())
+    fn dlx_router_key(&self) -> &'static str {
+        Box::leak(Box::new(format!("dlx-{}", self.router_key())))
     }
 
     // 单条消息过期时间： 默认30分钟 30 * 60 * 1000
@@ -173,7 +179,7 @@ pub trait RabbitMQQueue: Send + Sync {
         let channel = self.channel().await;
         channel
             .exchange_declare(
-                self.exchange().as_str(),
+                self.exchange(),
                 ExchangeKind::Direct,
                 ExchangeDeclareOptions::default(),
                 FieldTable::default(),
@@ -182,7 +188,7 @@ pub trait RabbitMQQueue: Send + Sync {
 
         let queue = channel
             .queue_declare(
-                self.queue().as_str(),
+                self.queue(),
                 QueueDeclareOptions::default(),
                 FieldTable::from(BTreeMap::from([
                     // 队列默认超时时间： 30分钟
@@ -202,8 +208,8 @@ pub trait RabbitMQQueue: Send + Sync {
         channel
             .queue_bind(
                 queue.name().as_str(),
-                self.exchange().as_str(),
-                self.router_key().as_str(),
+                self.exchange(),
+                self.router_key(),
                 QueueBindOptions::default(),
                 FieldTable::default(),
             )
@@ -218,7 +224,7 @@ pub trait RabbitMQQueue: Send + Sync {
 
         channel
             .exchange_declare(
-                self.dlx_exchange().as_str(),
+                self.dlx_exchange(),
                 ExchangeKind::Direct,
                 ExchangeDeclareOptions::default(),
                 FieldTable::default(),
@@ -227,7 +233,7 @@ pub trait RabbitMQQueue: Send + Sync {
 
         let dlx_queue = channel
             .queue_declare(
-                self.dlx_queue().as_str(),
+                self.dlx_queue(),
                 QueueDeclareOptions::default(),
                 FieldTable::default(),
             )
@@ -236,8 +242,8 @@ pub trait RabbitMQQueue: Send + Sync {
         channel
             .queue_bind(
                 dlx_queue.name().as_str(),
-                self.dlx_exchange().as_str(),
-                self.router_key().as_str(),
+                self.dlx_exchange(),
+                self.router_key(),
                 QueueBindOptions::default(),
                 FieldTable::default(),
             )
@@ -257,8 +263,8 @@ pub trait RabbitMQQueue: Send + Sync {
         self.channel()
             .await
             .basic_publish(
-                self.exchange().as_str(),
-                self.router_key().as_str(),
+                self.exchange(),
+                self.router_key(),
                 BasicPublishOptions::default(),
                 result.to_string().as_bytes(),
                 properties,
@@ -275,7 +281,7 @@ pub trait RabbitMQQueue: Send + Sync {
             .channel()
             .await
             .basic_consume(
-                self.dlx_queue().as_str(),
+                self.dlx_queue(),
                 "",
                 BasicConsumeOptions::default(),
                 FieldTable::default(),
