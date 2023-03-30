@@ -57,7 +57,7 @@ impl RabbitMQQueue for CommQueue {
     async fn callback(&self, data: Vec<u8>) {
         match serde_json::from_slice::<Self>(data.as_slice()) {
             Ok(result) => {
-                info!("CommQueue callback success, result: {:?}", result);
+                info!("CommQueue: {:?}", result);
             }
             Err(e) => {
                 error!("DlxCommQueue callback 数据解析错误: {}", e);
@@ -81,10 +81,6 @@ impl RabbitMQQueue for CommQueue {
 
     fn queue_name(&self) -> &'static str {
         "test-queue"
-    }
-
-    fn exchange_name(&self) -> &'static str {
-        ""
     }
 
     fn router_key(&self) -> &'static str {
@@ -120,10 +116,18 @@ impl RabbitMQDlxQueue for DlxCommQueue {}
 
 #[axum::async_trait]
 impl RabbitMQQueue for DlxCommQueue {
+    fn exchange_name(&self) -> &'static str {
+        "normal-exchange"
+    }
+
+    fn router_key(&self) -> &'static str {
+        "normal-router"
+    }
+    
     async fn callback(&self, data: Vec<u8>) {
         match serde_json::from_slice::<Self>(data.as_slice()) {
             Ok(result) => {
-                info!("DlxCommQueue callback success, result: {:?}", result);
+                info!("DlxCommQueue: {:?}", result);
             }
             Err(e) => {
                 error!("DlxCommQueue callback 数据解析错误: {}", e);

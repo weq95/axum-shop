@@ -175,12 +175,12 @@ pub trait RabbitMQQueue: Send + Sync {
 
     // 交换机名称
     fn exchange_name(&self) -> &'static str {
-        "normal-exchange"
+        ""
     }
 
     // 路由
     fn router_key(&self) -> &'static str {
-        "normal-router-key"
+        ""
     }
 
     // 消费端标签
