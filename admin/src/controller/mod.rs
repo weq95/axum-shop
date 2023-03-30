@@ -1,27 +1,30 @@
-use std::ops::{Add, DerefMut};
+use std::ops::DerefMut;
 
 use axum::{
     body::Body,
+    Extension,
     extract::{Multipart, Path},
     http::Request,
-    response::IntoResponse,
-    Extension, Json,
+    Json, response::IntoResponse,
 };
 use http::StatusCode;
 use serde_json::json;
 use tokio::io::AsyncWriteExt;
 use tracing::info;
 
+use common::{ApiResponse, IMAGES_PATH, redis, SchoolJson};
 use common::error::{ApiError, ApiResult};
 use common::jwt::{Claims, JWT};
-use common::rabbitmq::RabbitMQQueue;
-use common::{redis, ApiResponse, SchoolJson, IMAGES_PATH};
+use common::utils::rabbitmq::RabbitMQQueue;
 pub use user::*;
+
+use crate::controller::rabbitmq::DlxCommQueue;
 
 pub mod address;
 pub mod auth;
 pub mod order;
 pub mod products;
+pub mod rabbitmq;
 pub mod user;
 
 pub struct CommController;
@@ -75,7 +78,7 @@ impl CommController {
                     "access_token": access_token,
                     "refresh_token":refresh_token,
                 })))
-                .json(),
+                    .json(),
                 Err(_) => ApiResponse::fail_msg("refresh_token 刷新失败[02]".to_string()).json(),
             },
             None => ApiResponse::fail_msg("refresh_token 刷新失败[01]".to_string()).json(),
@@ -97,7 +100,7 @@ impl CommController {
                     return ApiResponse::response(Some(
                         json!({ "path": path, "preview_url":preview_url }),
                     ))
-                    .json();
+                        .json();
                 }
 
                 ApiResponse::fail_msg("文件上传失败".to_string()).json()
@@ -152,32 +155,26 @@ impl CommController {
         Ok(path)
     }
 
-    // 死信队列测试接口
-    pub async fn rabbit_mq_dlx_test(
-        Path(order_id): Path<i64>,
-        Extension(user): Extension<Claims>,
-    ) -> impl IntoResponse {
-        let mut time_now = chrono::Local::now();
-        let order = Box::new(common::rabbitmq::DlxOrder {
-            order_id,
-            created_at: Some(time_now.naive_local()),
-            ext_at: Some(time_now.add(chrono::Duration::seconds(30)).naive_local()),
-        });
-
-        match order.produce().await {
-            Ok(()) => ApiResponse::response(Some(json!({
-                "status": true,
-            })))
-            .json(),
-            Err(e) => ApiResponse::fail_msg("发送失败".to_string()).json(),
-        }
-    }
-
-    // 普通队列测试
     pub async fn rabbit_mq_test(
-        Path(id): Path<i64>,
         Extension(user): Extension<Claims>,
+        Json(payload): Json<serde_json::Value>,
     ) -> impl IntoResponse {
         todo!()
+    }
+
+    pub async fn rabbit_mq_dlx_test(
+        Extension(_user): Extension<Claims>,
+        Json(payload): Json<serde_json::Value>,
+    ) -> impl IntoResponse {
+        let order = DlxCommQueue {
+            r#type: 255,
+            data: payload,
+            crated_at: Some(chrono::Local::now().naive_local()),
+        };
+
+        match order.produce(30000).await {
+            Ok(()) => ApiResponse::response(Some(json!({"status": true}))).json(),
+            Err(e) => ApiResponse::fail_msg(e.to_string()).json(),
+        }
     }
 }

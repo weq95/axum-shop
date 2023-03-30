@@ -5,6 +5,8 @@ use std::sync::Arc;
 use axum::Extension;
 use tracing::info;
 
+use crate::controller::rabbitmq::MQMANAGER;
+
 mod controller;
 mod middleware;
 mod models;
@@ -25,8 +27,9 @@ async fn main() {
 
     let app_state = Arc::new(AppState {});
 
-    common::MQ_MANAGER.get().await;
     let router = router::routers().await.layer(Extension(app_state));
+
+    MQMANAGER.get().await;
 
     info!("admin-srv run at: {}", addr);
     axum::Server::bind(&addr)

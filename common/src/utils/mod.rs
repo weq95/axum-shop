@@ -11,7 +11,6 @@ use url::form_urlencoded::{byte_serialize, parse};
 
 use crate::casbin::PgSqlAdapter;
 use crate::error::ApiResult;
-use crate::rabbitmq::MQPluginManager;
 
 pub mod casbin;
 pub mod jwt;
@@ -58,15 +57,6 @@ lazy_static! {
         let cfg = &crate::application_config().await.rabbitmq;
         let addr = format!("{}://{}:{}@{}:{}/{}",cfg.scheme,cfg.username,cfg.password,cfg.host,cfg.port,cfg.vhost);
         Arc::new(lapin::Connection::connect(addr.as_str(), lapin::ConnectionProperties::default()).await.unwrap())
-    });
-
-    // mq 队列管理器
-    pub static ref MQ_MANAGER: AsyncOnce<Arc<MQPluginManager>> = AsyncOnce::new(async {
-        let mut rabbit = MQPluginManager::new();
-
-        rabbit.register_plugin();
-        println!("------------------------ mq start--------------------");
-        Arc::new(rabbit)
     });
 }
 

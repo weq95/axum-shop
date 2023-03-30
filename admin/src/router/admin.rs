@@ -121,11 +121,8 @@ pub async fn admin() -> Router {
     Router::new().nest(
         "/admin",
         Router::new()
-            .route(
-                "/rabbit_dlx_test/:id",
-                post(CommController::rabbit_mq_dlx_test),
-            )
-            .route("/rabbit_test/:id", post(CommController::rabbit_mq_test))
+            .route("/rabbit_dlx_test", post(CommController::rabbit_mq_dlx_test))
+            .route("/rabbit_test", post(CommController::rabbit_mq_test))
             .route("/refresh_token", post(CommController::refresh_token))
             .merge(users)
             .merge(address)
