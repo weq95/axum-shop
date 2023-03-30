@@ -157,8 +157,7 @@ pub trait RabbitMQQueue: Send + Sync {
                 Ok(delivery) => {
                     let _ = delivery.ack(BasicAckOptions::default()).await;
 
-                    info!("---------- callback ---------");
-                    self.callback(delivery.data);
+                    self.callback(delivery.data).await;
                 }
                 Err(err) => {
                     error!("{}", format!("消费信息错误: {}", err));

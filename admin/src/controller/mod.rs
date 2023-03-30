@@ -18,7 +18,7 @@ use common::jwt::{Claims, JWT};
 use common::utils::rabbitmq::RabbitMQQueue;
 pub use user::*;
 
-use crate::controller::rabbitmq::DlxCommQueue;
+use crate::controller::rabbitmq::{CommQueue, DlxCommQueue};
 
 pub mod address;
 pub mod auth;
@@ -159,7 +159,16 @@ impl CommController {
         Extension(user): Extension<Claims>,
         Json(payload): Json<serde_json::Value>,
     ) -> impl IntoResponse {
-        todo!()
+        let order = Box::new(CommQueue{
+            r#type: 200,
+            data: payload,
+            crated_at: Some(chrono::Local::now().naive_local()),
+        });
+
+        match order.produce(0) .await{
+            Ok(()) => ApiResponse::response(Some(json!({"status": true}))).json(),
+            Err(e) => ApiResponse::fail_msg(e.to_string()).json(),
+        }
     }
 
     pub async fn rabbit_mq_dlx_test(

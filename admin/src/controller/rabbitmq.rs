@@ -4,6 +4,7 @@ use std::sync::Arc;
 use async_once::AsyncOnce;
 use axum::{Extension, Json};
 use axum::response::IntoResponse;
+use chrono::Locale::mag_IN;
 use futures::StreamExt;
 use lapin::{BasicProperties, Channel, ExchangeKind};
 use lapin::options::{
@@ -26,6 +27,8 @@ lazy_static! {
         mq_mamnger
             .add_dlx_queue(Arc::new(Box::new(DlxCommQueue::default())))
             .await;
+
+        mq_mamnger.add_normal_queue(Arc::new(Box::new(CommQueue::default()))).await;
 
         Arc::new(mq_mamnger)
     });
@@ -52,7 +55,14 @@ impl Default for CommQueue {
 #[axum::async_trait]
 impl RabbitMQQueue for CommQueue {
     async fn callback(&self, data: Vec<u8>) {
-        info!("CommQueue callback: {:?}", data);
+        match serde_json::from_slice::<Self>(data.as_slice()) {
+            Ok(result) => {
+                info!("CommQueue callback success, result: {:?}", result);
+            }
+            Err(e) => {
+                error!("DlxCommQueue callback 数据解析错误: {}", e);
+            }
+        }
     }
 
     fn to_string(&self) -> String {
@@ -70,15 +80,19 @@ impl RabbitMQQueue for CommQueue {
     }
 
     fn queue_name(&self) -> &'static str {
-        "comm-queue"
+        "test-queue"
     }
 
     fn exchange_name(&self) -> &'static str {
-        "comm-exchange"
+        ""
     }
 
     fn router_key(&self) -> &'static str {
-        "comm-router-key"
+        self.queue_name()
+    }
+
+    fn consumer_tag(&self) -> &'static str {
+        "my_consumer"
     }
 }
 
@@ -107,10 +121,9 @@ impl RabbitMQDlxQueue for DlxCommQueue {}
 #[axum::async_trait]
 impl RabbitMQQueue for DlxCommQueue {
     async fn callback(&self, data: Vec<u8>) {
-        info!("DlxCommQueue callback: {:?}", &data);
         match serde_json::from_slice::<Self>(data.as_slice()) {
             Ok(result) => {
-                info!("callback success, result: {:?}", result);
+                info!("DlxCommQueue callback success, result: {:?}", result);
             }
             Err(e) => {
                 error!("DlxCommQueue callback 数据解析错误: {}", e);
