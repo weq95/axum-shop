@@ -5,7 +5,7 @@ use async_once::AsyncOnce;
 use axum::{Extension, Json};
 use axum::response::IntoResponse;
 use futures::StreamExt;
-use lapin::{BasicProperties, ExchangeKind};
+use lapin::{BasicProperties, Channel, ExchangeKind};
 use lapin::options::{
     BasicAckOptions, BasicConsumeOptions, BasicPublishOptions, ExchangeDeclareOptions,
     QueueBindOptions, QueueDeclareOptions,
@@ -49,7 +49,8 @@ impl Default for CommQueue {
     }
 }
 
-/*impl RabbitMQQueue for CommQueue {
+#[axum::async_trait]
+impl RabbitMQQueue for CommQueue {
     async fn callback(&self, data: Vec<u8>) {
         info!("CommQueue callback: {:?}", data);
     }
@@ -58,9 +59,7 @@ impl Default for CommQueue {
         serde_json::to_string(self).unwrap()
     }
 
-    async fn init_queue(&self) -> lapin::Result<()> {
-        let channel = self.channel().await?;
-
+    async fn init_queue(&self, channel: Channel) -> lapin::Result<()> {
         let _queue = channel.queue_declare(
             self.queue_name(),
             QueueDeclareOptions::default(),
@@ -81,7 +80,7 @@ impl Default for CommQueue {
     fn router_key(&self) -> &'static str {
         "comm-router-key"
     }
-}*/
+}
 
 
 /// 通用死信队列
@@ -123,9 +122,7 @@ impl RabbitMQQueue for DlxCommQueue {
         serde_json::to_string(self).unwrap()
     }
 
-    async fn init_queue(&self) -> lapin::Result<()> {
-        let channel = self.channel().await?;
-
+    async fn init_queue(&self, channel: Channel) -> lapin::Result<()> {
         channel
             .exchange_declare(
                 self.exchange_name(),

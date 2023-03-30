@@ -41,9 +41,9 @@ impl MQManager {
         }
 
         self.queue.insert(queue_name, plugin.clone());
-
+        let channel = plugin.channel().await.unwrap();
         info!("{}: [normal]队列开始启动", queue_name);
-        if let Err(e) = plugin.init_queue().await {
+        if let Err(e) = plugin.init_queue(channel).await {
             error!(
                 "{}",
                 format!(" {} [normal]队列初始化失败: {}", queue_name, e)
@@ -76,13 +76,14 @@ impl MQManager {
         self.dlx_queue.insert(queue_name, plugin.clone());
 
         info!("{}: [dlx]普通队列开始启动", queue_name);
-        if let Err(e) = plugin.init_queue().await {
+        let channel = plugin.channel().await.unwrap();
+        if let Err(e) = plugin.init_queue(channel.clone()).await {
             error!("{}", format!(" {} 队列初始化失败: {}", queue_name, e));
             return;
         }
 
         info!("{}: [dlx]死信队列开始启动", queue_name);
-        if let Err(e) = plugin.init_dlx_queue().await {
+        if let Err(e) = plugin.init_dlx_queue(channel).await {
             error!(
                 "{}",
                 format!(" {} [dlx]队列初始化失败: {}", plugin.dlx_queue_name(), e)
@@ -113,7 +114,7 @@ pub trait RabbitMQQueue: Send + Sync {
     fn to_string(&self) -> String;
 
     // 初始化队列
-    async fn init_queue(&self) -> lapin::Result<()>;
+    async fn init_queue(&self, channel: Channel) -> lapin::Result<()>;
 
     // 生产者
     // expiration: 30分钟 = 30 * 60 * 1000
@@ -200,9 +201,7 @@ pub trait RabbitMQQueue: Send + Sync {
 #[axum::async_trait]
 pub trait RabbitMQDlxQueue: RabbitMQQueue {
     // 初始化死信队列
-    async fn init_dlx_queue(&self) -> lapin::Result<()> {
-        let channel = self.channel().await?;
-
+    async fn init_dlx_queue(&self, channel: Channel) -> lapin::Result<()> {
         channel
             .exchange_declare(
                 self.dlx_exchange_name(),
