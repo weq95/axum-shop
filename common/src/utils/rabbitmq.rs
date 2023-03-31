@@ -215,7 +215,7 @@ pub trait RabbitMQDlxQueue: RabbitMQQueue {
             .queue_bind(
                 dlx_queue.name().as_str(),
                 self.dlx_exchange_name(),
-                self.router_key(),
+                self.dlx_router_key(),
                 QueueBindOptions::default(),
                 FieldTable::default(),
             )
@@ -232,5 +232,10 @@ pub trait RabbitMQDlxQueue: RabbitMQQueue {
     // 死信交换机名称
     fn dlx_exchange_name(&self) -> &'static str {
         Box::leak(Box::new(format!("dlx-{}", self.exchange_name())))
+    }
+
+    // 死信路由器
+    fn dlx_router_key(&self) -> &'static str {
+        Box::leak(Box::new(format!("dlx-{}", self.router_key())))
     }
 }

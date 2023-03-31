@@ -324,7 +324,7 @@ impl RabbitMQQueue for DlxCommQueue {
                     ),
                     (
                         "x-dead-letter-routing-key".into(),
-                        AMQPValue::LongString(self.router_key().into()),
+                        AMQPValue::LongString(self.dlx_router_key().into()),
                     ),
                 ])),
             )
