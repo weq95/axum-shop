@@ -11,7 +11,6 @@ use url::form_urlencoded::{byte_serialize, parse};
 
 use crate::casbin::PgSqlAdapter;
 use crate::error::ApiResult;
-use crate::rabbitmq::{DlxOrder, RabbitMQDeadQueue};
 
 pub mod casbin;
 pub mod jwt;
@@ -58,11 +57,6 @@ lazy_static! {
         let cfg = &crate::application_config().await.rabbitmq;
         let addr = format!("{}://{}:{}@{}:{}/{}",cfg.scheme,cfg.username,cfg.password,cfg.host,cfg.port,cfg.vhost);
         Arc::new(lapin::Connection::connect(addr.as_str(), lapin::ConnectionProperties::default()).await.unwrap())
-    });
-
-    // 死信队列
-    pub static ref DEAD_QUEUE: AsyncOnce<Arc<DlxOrder >> = AsyncOnce::new(async {
-        Arc::new(DlxOrder::new())
     });
 }
 
