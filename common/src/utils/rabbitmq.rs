@@ -1,15 +1,14 @@
-use std::collections::BTreeMap;
 use std::collections::HashMap;
 use std::sync::Arc;
 
 use futures::StreamExt;
 use lapin::{
-    BasicProperties,
-    Channel,
-    ExchangeKind, options::{
+    options::{
         BasicAckOptions, BasicConsumeOptions, BasicPublishOptions, ExchangeDeclareOptions,
         QueueBindOptions, QueueDeclareOptions,
-    }, types::{AMQPValue, FieldTable},
+    },
+    types::FieldTable,
+    BasicProperties, Channel, ExchangeKind,
 };
 use tracing::{error, info};
 
