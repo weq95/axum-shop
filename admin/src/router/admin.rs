@@ -8,7 +8,7 @@ use middleware::casbin::CasbinAuthLayer;
 use crate::controller::products::ProductController;
 use crate::controller::{
     address::AddressController, auth::RolePermissionController, order::OrderController,
-    AdminController, CommController,
+    user::AdminController, CommController,
 };
 use crate::middleware;
 
@@ -122,6 +122,7 @@ pub async fn admin() -> Router {
         "/admin",
         Router::new()
             .route("/refresh_token", post(CommController::refresh_token))
+            .route("/test_mq", post(CommController::test_mq))
             .merge(users)
             .merge(address)
             .merge(auth)
