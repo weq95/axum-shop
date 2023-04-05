@@ -5,7 +5,8 @@ use axum::response::IntoResponse;
 use axum::{Extension, Json};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
-use tracing::error;
+use sqlx::Connection;
+use tracing::{error, info};
 use validator::Validate;
 
 use common::error::format_errors;
@@ -225,7 +226,54 @@ impl RabbitMQQueue for DelayOrder {
                 error!("数据解析失败，订单超时未被正确处理: {}", e);
             }
             Ok(order) => {
-                println!("订单详情： {:?}", order);
+                let order = match Orders::get(order.order_id, order.user_id).await {
+                    Err(err) => {
+                        error!("订单不存在： {}", err);
+                        return;
+                    }
+                    Ok(result) => {
+                        if result.paid_at.is_some() {
+                            // 订单已支付， 不再进行后续处理
+                            return;
+                        }
+                        result
+                    }
+                };
+
+                let items: Vec<HashMap<i64, i64>> = match OrderItems::get(order.id).await {
+                    Err(err) => {
+                        error!("订单详情不存在： {}", err);
+                        return;
+                    }
+                    Ok(result) => result
+                        .into_iter()
+                        .map(|value| {
+                            let mut sku_id: i64 = 0;
+
+                            if let Some(value) = &value.product_sku.0.get("sku_id") {
+                                if let Some(id) = value.as_i64() {
+                                    sku_id = id
+                                }
+                            }
+
+                            HashMap::from([(value.product_id, sku_id)])
+                        })
+                        .collect::<Vec<HashMap<i64, i64>>>(),
+                };
+
+                if let Ok(mut tx) = common::postgres().await.begin().await {
+                    if let Err(err) = ProductSku::buckle_inventory(items, 1, &mut tx).await {
+                        error!("订单超时未支付， 增加库存失败： {}", err);
+                        tx.rollback().await.unwrap();
+                        return;
+                    }
+
+                    tx.commit().await.unwrap();
+                    info!("-------------------- success --------------------");
+                    return;
+                }
+
+                error!("订单超时未支付，处理业务失败");
             }
         }
     }
