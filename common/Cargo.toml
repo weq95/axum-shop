@@ -15,7 +15,7 @@ serde_json = { version = "1.0.93" }
 serde = { version = "1.0.152", features = ["derive"] }
 serde_yaml = "0.9.17"
 chrono = { version = "0.4.23", features = ["unstable-locales"] }
-validator = { version = "0.15", features = ["derive", "phone", "unic"] }
+validator = { version = "0.16.0", features = ["derive", "phone", "unic"] }
 sqlx = { version = "0.6.2", features = ["runtime-tokio-native-tls", "postgres", "chrono"] }
 md5 = "0.7.0"
 lazy_static = "1.4.0"

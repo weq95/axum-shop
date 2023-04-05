@@ -1,15 +1,16 @@
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap};
 use std::sync::Arc;
 
 use futures::StreamExt;
 use lapin::{
-    options::{
+    BasicProperties,
+    Channel,
+    ExchangeKind, options::{
         BasicAckOptions, BasicConsumeOptions, BasicPublishOptions, ExchangeDeclareOptions,
         QueueBindOptions, QueueDeclareOptions,
-    },
-    types::FieldTable,
-    BasicProperties, Channel, ExchangeKind,
+    }, types::FieldTable,
 };
+use lapin::types::AMQPValue;
 use tracing::{error, info};
 
 /// 队列管理器
@@ -68,14 +69,8 @@ impl MQManager {
 
         self.dlx_queue.insert(queue_name, plugin.clone());
 
-        info!("{}: [dlx]普通队列开始启动", queue_name);
-        let channel = plugin.channel().await.unwrap();
-        if let Err(e) = plugin.init_queue(channel.clone()).await {
-            error!("{}", format!(" {} 队列初始化失败: {}", queue_name, e));
-            return;
-        }
-
         info!("{}: [dlx]死信队列开始启动", queue_name);
+        let channel = plugin.channel().await.unwrap();
         if let Err(e) = plugin.init_dlx_queue(channel).await {
             error!(
                 "{}",
@@ -107,7 +102,30 @@ pub trait RabbitMQQueue: Send + Sync {
     fn to_string(&self) -> String;
 
     // 初始化队列
-    async fn init_queue(&self, channel: Channel) -> lapin::Result<()>;
+    async fn init_queue(&self, channel: Channel) -> lapin::Result<()> {
+        channel.exchange_declare(
+            self.exchange_name(),
+            ExchangeKind::Direct,
+            ExchangeDeclareOptions::default(),
+            FieldTable::default(),
+        ).await?;
+
+        let queue = channel.queue_declare(
+            self.queue_name(),
+            QueueDeclareOptions::default(),
+            FieldTable::default(),
+        ).await?;
+
+        channel.queue_bind(
+            queue.name().as_str(),
+            self.exchange_name(),
+            self.router_key(),
+            QueueBindOptions::default(),
+            FieldTable::default(),
+        ).await?;
+
+        Ok(())
+    }
 
     // 生产者
     // expiration: 30分钟 = 30 * 60 * 1000
@@ -162,19 +180,13 @@ pub trait RabbitMQQueue: Send + Sync {
     }
 
     // 队列名称
-    fn queue_name(&self) -> &'static str {
-        "default-queue"
-    }
+    fn queue_name(&self) -> &'static str;
 
     // 交换机名称
-    fn exchange_name(&self) -> &'static str {
-        ""
-    }
+    fn exchange_name(&self) -> &'static str;
 
     // 路由
-    fn router_key(&self) -> &'static str {
-        ""
-    }
+    fn router_key(&self) -> &'static str;
 
     // 标签
     fn consumer_tag(&self) -> &'static str {
@@ -194,6 +206,46 @@ pub trait RabbitMQQueue: Send + Sync {
 pub trait RabbitMQDlxQueue: RabbitMQQueue {
     // 初始化死信队列
     async fn init_dlx_queue(&self, channel: Channel) -> lapin::Result<()> {
+        // -------------------------- 1. 正常队列 --------------------------
+        channel
+            .exchange_declare(
+                self.exchange_name(),
+                ExchangeKind::Direct,
+                ExchangeDeclareOptions::default(),
+                FieldTable::default(),
+            )
+            .await?;
+
+        let queue = channel
+            .queue_declare(
+                self.queue_name(),
+                QueueDeclareOptions::default(),
+                FieldTable::from(BTreeMap::from([
+                    // 队列默认超时时间： 30分钟
+                    ("x-message-ttl".into(), AMQPValue::LongUInt(30 * 60 * 1000)),
+                    (
+                        "x-dead-letter-exchange".into(),
+                        AMQPValue::LongString(self.dlx_exchange_name().into()),
+                    ),
+                    (
+                        "x-dead-letter-routing-key".into(),
+                        AMQPValue::LongString(self.dlx_router_key().into()),
+                    ),
+                ])),
+            )
+            .await?;
+
+        channel
+            .queue_bind(
+                queue.name().as_str(),
+                self.exchange_name(),
+                self.router_key(),
+                QueueBindOptions::default(),
+                FieldTable::default(),
+            )
+            .await?;
+
+        // -------------------------- 2. 死信队列 --------------------------
         channel
             .exchange_declare(
                 self.dlx_exchange_name(),

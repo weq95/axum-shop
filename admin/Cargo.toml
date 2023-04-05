@@ -17,7 +17,7 @@ tracing = { version = "0.1.37"}
 tracing-subscriber = { version = "0.3.16",features = ["alloc"] }
 percent-encoding = "2.2.0"
 sqlx = { version = "0.6.2", features = ["runtime-tokio-native-tls", "postgres", "bigdecimal", "decimal", "all-types"] }
-validator = { version = "0.15.0", features = ["derive", "phone"] }
+validator = { version = "0.16.0", features = ["derive", "phone"] }
 lazy_static = "1.4.0"
 async_once = "0.2.6"
 tower = { version = "0.4.13", features = ["full"] }

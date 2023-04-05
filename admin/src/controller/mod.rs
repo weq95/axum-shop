@@ -241,24 +241,16 @@ impl RabbitMQQueue for CommQueue {
         serde_json::to_string(self).unwrap()
     }
 
-    async fn init_queue(&self, channel: Channel) -> lapin::Result<()> {
-        let _queue = channel
-            .queue_declare(
-                self.queue_name(),
-                QueueDeclareOptions::default(),
-                FieldTable::default(),
-            )
-            .await;
-
-        Ok(())
-    }
-
     fn queue_name(&self) -> &'static str {
-        "normal"
+        "normal-queue"
     }
 
     fn router_key(&self) -> &'static str {
-        self.queue_name()
+       "normal-queue-router-key"
+    }
+
+    fn exchange_name(&self) -> &'static str {
+       "normal-queue-exchange"
     }
 
     fn consumer_tag(&self) -> &'static str {
@@ -301,58 +293,16 @@ impl RabbitMQQueue for DlxCommQueue {
         serde_json::to_string(self).unwrap()
     }
 
-    async fn init_queue(&self, channel: Channel) -> lapin::Result<()> {
-        channel
-            .exchange_declare(
-                self.exchange_name(),
-                ExchangeKind::Direct,
-                ExchangeDeclareOptions::default(),
-                FieldTable::default(),
-            )
-            .await?;
-
-        let queue = channel
-            .queue_declare(
-                self.queue_name(),
-                QueueDeclareOptions::default(),
-                FieldTable::from(BTreeMap::from([
-                    // 队列默认超时时间： 30分钟
-                    ("x-message-ttl".into(), AMQPValue::LongUInt(30 * 60 * 1000)),
-                    (
-                        "x-dead-letter-exchange".into(),
-                        AMQPValue::LongString(self.dlx_exchange_name().into()),
-                    ),
-                    (
-                        "x-dead-letter-routing-key".into(),
-                        AMQPValue::LongString(self.dlx_router_key().into()),
-                    ),
-                ])),
-            )
-            .await?;
-
-        channel
-            .queue_bind(
-                queue.name().as_str(),
-                self.exchange_name(),
-                self.router_key(),
-                QueueBindOptions::default(),
-                FieldTable::default(),
-            )
-            .await?;
-
-        Ok(())
-    }
-
     fn queue_name(&self) -> &'static str {
-        "normal-queue"
+        "normal-order-queue"
     }
 
     fn exchange_name(&self) -> &'static str {
-        "normal-exchange"
+        "normal-order-exchange"
     }
 
     fn router_key(&self) -> &'static str {
-        "normal-router"
+        "normal-order-router"
     }
 }
 
