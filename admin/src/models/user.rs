@@ -17,6 +17,11 @@ use crate::models::product_skus::ProductSku;
 
 pub struct Admin {
     pub id: i64,
+    pub name: String,
+    pub age: u8,
+    pub nickname: String,
+    pub phone: String,
+    pub email: String,
 }
 
 impl Admin {
@@ -217,5 +222,24 @@ impl Admin {
 
         pagination.set_data(result);
         Ok(())
+    }
+
+    // 获取用户信息
+    pub async fn user_maps(ids: Vec<i64>) -> ApiResult<HashMap<i64, Admin>> {
+        Ok(sqlx::query("select * from users where id = any($1)")
+            .bind(ids)
+            .fetch_all(common::postgres().await)
+            .await?
+            .into_iter()
+            .map(|row| Admin {
+                id: row.get::<i64, _>("id"),
+                age: row.get::<i16, _>("age") as u8,
+                name: row.get("name"),
+                nickname: row.get("nickname"),
+                phone: row.get("phone"),
+                email: row.get("email"),
+            })
+            .map(|row| (row.id, row))
+            .collect::<HashMap<i64, Admin>>())
     }
 }

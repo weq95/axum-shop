@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 
 use serde::{Deserialize, Serialize};
+use serde_json::json;
 use sqlx::types::Json;
 use sqlx::Row;
 
@@ -260,6 +261,25 @@ impl Product {
                 .fetch_one(common::postgres().await)
                 .await?
                 .get::<bool, _>("exists"),
+        )
+    }
+
+    // 获取商品信息
+    pub async fn product_maps(ids: Vec<i64>) -> ApiResult<HashMap<i64, serde_json::Value>> {
+        Ok(
+            sqlx::query("select id, title from products where id = any($1)")
+                .bind(ids)
+                .fetch_all(common::postgres().await)
+                .await?
+                .into_iter()
+                .map(|row| {
+                    json!({
+                        "id": row.get::<i64, _>("id"),
+                        "title": row.get::<String, _>("title")
+                    })
+                })
+                .map(|row| (row.get("id").unwrap().as_i64().unwrap(), row))
+                .collect::<HashMap<i64, serde_json::Value>>(),
         )
     }
 }

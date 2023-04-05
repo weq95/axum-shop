@@ -40,6 +40,14 @@ impl<T: Serialize> ApiResponse<T> {
         }
     }
 
+    pub fn success() -> Self {
+        Self {
+            code: SUCCESS,
+            message: "success".to_string(),
+            data: None,
+        }
+    }
+
     pub fn success_code(code: u16) -> Self {
         Self {
             code,

@@ -1,6 +1,7 @@
+use std::collections::HashMap;
+
 use serde_json::json;
 use sqlx::Row;
-use std::collections::HashMap;
 
 use common::error::{ApiError, ApiResult};
 use common::Pagination;
@@ -24,13 +25,14 @@ pub struct Orders {
     pub closed: bool,
     pub reviewed: bool,
     pub ship_status: ShipStatus,
+    pub ship_data: sqlx::types::Json<Vec<HashMap<String, serde_json::Value>>>,
     pub extra: String,
     pub created_at: chrono::NaiveDateTime,
     pub updated_at: chrono::NaiveDateTime,
 }
 
 /// 支付方式
-#[derive(Debug, sqlx::Type)]
+#[derive(Debug, PartialEq, sqlx::Type)]
 #[repr(i16)]
 pub enum PayMethod {
     // 未支付
@@ -46,7 +48,7 @@ pub enum PayMethod {
 }
 
 /// 退款状态
-#[derive(Debug, sqlx::Type)]
+#[derive(Debug, PartialEq, sqlx::Type)]
 #[repr(i16)]
 pub enum RefundStatus {
     // 否(未退款)
@@ -62,7 +64,7 @@ pub enum RefundStatus {
 }
 
 /// 物理状态
-#[derive(Debug, sqlx::Type)]
+#[derive(Debug, PartialEq, sqlx::Type)]
 #[repr(i16)]
 pub enum ShipStatus {
     // 处理中
@@ -71,6 +73,40 @@ pub enum ShipStatus {
     ToBeReceived = 1,
     // 已收货
     Received = 2,
+}
+
+impl ToString for PayMethod {
+    fn to_string(&self) -> String {
+        match self {
+            PayMethod::Unknown => "未支付".to_string(),
+            PayMethod::AliPay => "支付宝".to_string(),
+            PayMethod::Wechat => "微信支付".to_string(),
+            PayMethod::GooglePay => "Google支付".to_string(),
+            PayMethod::PayPal => "PayPal支付".to_string(),
+        }
+    }
+}
+
+impl ToString for RefundStatus {
+    fn to_string(&self) -> String {
+        match self {
+            RefundStatus::No => "未退货".to_string(),
+            RefundStatus::AlreadyApplied => "已申请退款".to_string(),
+            RefundStatus::Waiting => "退款中".to_string(),
+            RefundStatus::Yes => "退款成功".to_string(),
+            RefundStatus::Fail => "退款失败".to_string(),
+        }
+    }
+}
+
+impl ToString for ShipStatus {
+    fn to_string(&self) -> String {
+        match self {
+            ShipStatus::Processing => "处理中".to_string(),
+            ShipStatus::ToBeReceived => "待收货".to_string(),
+            ShipStatus::Received => "已收货".to_string(),
+        }
+    }
 }
 
 impl Default for PayMethod {
@@ -119,15 +155,17 @@ impl Orders {
         order_items: HashMap<i64, ItemProductSku>,
     ) -> ApiResult<i64> {
         let mut tx = common::postgres().await.begin().await?;
+        let ship_data: Vec<HashMap<String, serde_json::Value>> = Vec::new();
         let order_id = sqlx::query(
-            "INSERT INTO orders (no,user_id,address,total_amount,remark,ship_status) VALUES ($1,$2,$3,$4,$5,$6) RETURNING id"
+            "INSERT INTO orders (no,user_id,address,total_amount,remark,ship_status,ship_data) VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING id"
         )
             .bind(Self::get_order_no().await?)
             .bind(user_id)
             .bind(json!(address))
             .bind(total_money)
             .bind(remark)
-            .bind(0)
+            .bind::<i16>(ShipStatus::Processing.into())
+            .bind(json!(ship_data))
             .fetch_one(&mut tx)
             .await?.get::<i64, _>("id");
 
@@ -268,5 +306,46 @@ impl Orders {
             RefundStatus::Waiting => "退款中".to_string(),
             RefundStatus::AlreadyApplied => "已申请退款，等待审核".to_string(),
         }
+    }
+
+    // 发货
+    pub async fn ship(userid: i64, id: i64, no: String, company: String) -> ApiResult<bool> {
+        let order = Orders::get(id, userid).await?;
+        if order.ship_status != ShipStatus::Processing || order.pay_method == PayMethod::Unknown {
+            return Ok(false);
+        }
+
+        Ok(sqlx::query("update orders set ship_status = $1,ship_data=$2, updated_at = $3 where id = $4 and user_id = $5")
+            .bind::<i16>(ShipStatus::ToBeReceived.into())
+            .bind(json!(vec![
+            HashMap::from([
+            ("express_no", no),
+            ("company", company),
+        ])]))
+            .bind(chrono::Local::now())
+            .bind(id)
+            .bind(userid)
+            .execute(common::postgres().await)
+            .await?.rows_affected() > 0)
+    }
+
+    // 确认收获
+    pub async fn received(id: i64, userid: i64) -> ApiResult<bool> {
+        let order = Orders::get(id, userid).await?;
+        if order.ship_status != ShipStatus::ToBeReceived {
+            return Ok(false);
+        }
+
+        Ok(sqlx::query(
+            "update orders set ship_status = $1, updated_at = $2 where id = $3 and user_id = $4",
+        )
+        .bind::<i16>(ShipStatus::Received.into())
+        .bind(chrono::Local::now())
+        .bind(id)
+        .bind(userid)
+        .execute(common::postgres().await)
+        .await?
+        .rows_affected()
+            > 0)
     }
 }

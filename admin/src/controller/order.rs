@@ -5,13 +5,12 @@ use axum::response::IntoResponse;
 use axum::{Extension, Json};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
-use sqlx::Connection;
 use tracing::{error, info};
 use validator::Validate;
 
 use common::error::format_errors;
 use common::jwt::Claims;
-use common::order::ReqCreateOrder;
+use common::order::{OrderEvaluate, OrderShip, ReqCreateOrder};
 use common::rabbitmq::{RabbitMQDlxQueue, RabbitMQQueue};
 use common::{ApiResponse, PagePer, Pagination};
 
@@ -50,22 +49,23 @@ impl OrderController {
 
         ApiResponse::response(Some(json!({
             "id": order.id,
-        "no": order.no,
-        "user_id": order.user_id,
-        "address": order.address,
-        "total_amount":order.total_amount.0/100,
-        "remark": order.remark,
-        "paid_at": order.paid_at,
-        "pay_method": Into::<i16>::into(order.pay_method),
-        "pay_no": order.pay_no,
-        "refund_status":  Into::<i16>::into(order.refund_status),
-        "refund_no":order.refund_no,
-        "closed": order.closed,
-        "reviewed": order.reviewed,
-        "ship_status": Into::<i16>::into(order.ship_status),
-        "extra": order.extra,
-        "created_at": order.created_at.format("%Y-%m-%d %H:%M:%S").to_string(),
-        "updated_at": order.updated_at.format("%Y-%m-%d %H:%M:%S").to_string(),
+            "ship_data": order.ship_data,
+            "no": order.no,
+            "user_id": order.user_id,
+            "address": order.address,
+            "total_amount":order.total_amount.0/100,
+            "remark": order.remark,
+            "paid_at": order.paid_at,
+            "pay_method": order.pay_method.to_string(),
+            "pay_no": order.pay_no,
+            "refund_status":  order.refund_status.to_string(),
+            "refund_no":order.refund_no,
+            "closed": order.closed,
+            "reviewed": order.reviewed,
+            "ship_status": order.ship_status.to_string(),
+            "extra": order.extra,
+            "created_at": order.created_at.format("%Y-%m-%d %H:%M:%S").to_string(),
+            "updated_at": order.updated_at.format("%Y-%m-%d %H:%M:%S").to_string(),
             "items": order_items,
         })))
         .json()
@@ -76,25 +76,23 @@ impl OrderController {
         Extension(user): Extension<Claims>,
         Json(inner): Json<ReqCreateOrder>,
     ) -> impl IntoResponse {
-        let mut ids = HashMap::new();
-        match &inner.validate() {
-            Ok(()) => (),
-            Err(e) => return ApiResponse::fail_msg(e.to_string()).json(),
+        if let Err(e) = inner.validate() {
+            return ApiResponse::success_code_data(common::FAIL, Some(json!(format_errors(e))))
+                .json();
         }
+        let mut ids = HashMap::new();
+
         if let Some(result) = &inner.products {
             for req in result {
-                match req.validate() {
-                    Ok(()) => {
-                        ids.insert(req.product_id.unwrap(), req.product_sku_id.unwrap());
-                    }
-                    Err(e) => {
-                        return ApiResponse::success_code_data(
-                            common::FAIL,
-                            Some(json!(format_errors(e))),
-                        )
-                        .json();
-                    }
+                if let Err(e) = req.validate() {
+                    return ApiResponse::success_code_data(
+                        common::FAIL,
+                        Some(json!(format_errors(e))),
+                    )
+                    .json();
                 }
+
+                ids.insert(req.product_id.unwrap(), req.product_sku_id.unwrap());
             }
         }
 
@@ -196,6 +194,95 @@ impl OrderController {
     }
 
     pub async fn delete() -> impl IntoResponse {}
+
+    // 发货
+    pub async fn ship(
+        Extension(claims): Extension<Claims>,
+        Json(payload): Json<OrderShip>,
+    ) -> impl IntoResponse {
+        if let Err(e) = payload.validate() {
+            return ApiResponse::success_code_data(
+                common::response::FAIL,
+                Some(json!(format_errors(e))),
+            )
+            .json();
+        }
+
+        let company = payload.express_company.unwrap();
+        let no = payload.express_no.unwrap();
+        let id = payload.id.unwrap();
+
+        match Orders::ship(claims.id, id, no, company).await {
+            Ok(bool_val) => ApiResponse::response(Some(json!({
+                "status": bool_val,
+            })))
+            .json(),
+            Err(e) => ApiResponse::fail_msg(e.to_string()).json(),
+        }
+    }
+
+    // 收货
+    pub async fn received(
+        Extension(claims): Extension<Claims>,
+        Path(id): Path<i64>,
+    ) -> impl IntoResponse {
+        match Orders::received(id, claims.id).await {
+            Ok(bool_val) => ApiResponse::response(Some(json!({
+                "status": bool_val,
+            })))
+            .json(),
+            Err(e) => ApiResponse::fail_msg(e.to_string()).json(),
+        }
+    }
+
+    // 商品评价
+    pub async fn evaluate(
+        Extension(claims): Extension<Claims>,
+        Json(payload): Json<OrderEvaluate>,
+    ) -> impl IntoResponse {
+        if let Err(e) = payload.validate() {
+            return ApiResponse::success_code_data(
+                common::response::FAIL,
+                Some(json!(format_errors(e))),
+            )
+            .json();
+        }
+
+        let order = match OrderItems::detail(payload.id.unwrap(), payload.order_id.unwrap()).await {
+            Ok(data) => data,
+            Err(e) => {
+                error!("商品评价查询订单信息错误： {}", e);
+                return ApiResponse::fail_msg("订单不存在".to_string()).json();
+            }
+        };
+
+        match order
+            .evaluate(
+                claims.id,
+                payload.score.unwrap() as u8,
+                payload.content.unwrap(),
+            )
+            .await
+        {
+            Ok(()) => ApiResponse::success().json(),
+            Err(e) => ApiResponse::fail_msg(e.to_string()).json(),
+        }
+    }
+
+    // 商品评价列表
+    pub async fn evaluate_list(
+        Query(page_per): Query<PagePer>,
+        Extension(claims): Extension<Claims>,
+        Path(product_id): Path<i64>,
+    ) -> impl IntoResponse {
+        let mut pagination: Pagination<HashMap<String, serde_json::Value>> =
+            Pagination::new(vec![], page_per);
+
+        match OrderItems::evaluate_list(product_id, &mut pagination).await {
+            Ok(()) => ApiResponse::response(Some(pagination)).json(),
+            Err(e) => ApiResponse::fail_msg(e.to_string()).json(),
+        }
+    }
 }
 
 #[derive(Serialize, Deserialize, Debug)]

@@ -112,6 +112,12 @@ pub async fn admin() -> Router {
                 "/",
                 get(OrderController::index).post(OrderController::store),
             )
+            .route("/received/:id", post(OrderController::received))
+            .route("/ship", post(OrderController::ship))
+            .route(
+                "/evaluate/:id",
+                get(OrderController::evaluate_list).post(OrderController::evaluate),
+            )
             .route(
                 "/:id",
                 get(OrderController::get).post(OrderController::update),
