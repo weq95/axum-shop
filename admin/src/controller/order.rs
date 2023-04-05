@@ -3,12 +3,15 @@ use std::collections::HashMap;
 use axum::extract::{Path, Query};
 use axum::response::IntoResponse;
 use axum::{Extension, Json};
+use serde::{Deserialize, Serialize};
 use serde_json::json;
+use tracing::error;
 use validator::Validate;
 
 use common::error::format_errors;
 use common::jwt::Claims;
 use common::order::ReqCreateOrder;
+use common::rabbitmq::{RabbitMQDlxQueue, RabbitMQQueue};
 use common::{ApiResponse, PagePer, Pagination};
 
 use crate::models::address::UserAddress;
@@ -155,7 +158,17 @@ impl OrderController {
         )
         .await;
         match result {
-            Ok(order_id) => ApiResponse::response(Some(json!({ "id": order_id }))).json(),
+            Ok(order_id) => {
+                let delay_order = DelayOrder {
+                    order_id: order_id,
+                    user_id: user.id,
+                    created_at: Some(chrono::Local::now().naive_local()),
+                };
+                if let Err(e) = delay_order.produce(1 * 60 * 1000).await {
+                    error!("订单加入队列失败： {}", e);
+                }
+                ApiResponse::response(Some(json!({ "id": order_id }))).json()
+            }
             Err(e) => ApiResponse::fail_msg(e.to_string()).json(),
         }
     }
@@ -182,4 +195,54 @@ impl OrderController {
     }
 
     pub async fn delete() -> impl IntoResponse {}
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct DelayOrder {
+    order_id: i64,
+    user_id: i64,
+    created_at: Option<chrono::NaiveDateTime>,
+}
+
+impl Default for DelayOrder {
+    fn default() -> Self {
+        DelayOrder {
+            order_id: 0,
+            user_id: 0,
+            created_at: None,
+        }
+    }
+}
+
+#[axum::async_trait]
+impl RabbitMQDlxQueue for DelayOrder {}
+
+#[axum::async_trait]
+impl RabbitMQQueue for DelayOrder {
+    async fn callback(&self, data: Vec<u8>) {
+        match serde_json::from_slice::<DelayOrder>(data.as_slice()) {
+            Err(e) => {
+                error!("数据解析失败，订单超时未被正确处理: {}", e);
+            }
+            Ok(order) => {
+                println!("订单详情： {:?}", order);
+            }
+        }
+    }
+
+    fn to_string(&self) -> String {
+        serde_json::to_string(self).unwrap()
+    }
+
+    fn queue_name(&self) -> &'static str {
+        "orders-queue"
+    }
+
+    fn exchange_name(&self) -> &'static str {
+        "orders-exchange"
+    }
+
+    fn router_key(&self) -> &'static str {
+        "orders-router-key"
+    }
 }

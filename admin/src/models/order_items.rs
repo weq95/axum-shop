@@ -34,11 +34,12 @@ impl OrderItems {
         order_id: i64,
         items: HashMap<i64, ItemProductSku>,
         tx: &mut Transaction<'_, Postgres>,
-    ) -> ApiResult<bool> {
-        let item_len = &items.len();
+    ) -> ApiResult<(bool, Vec<HashMap<i64, i64>>)> {
+        let item_len = items.len() as u64;
         let mut sql_builder = String::new();
         let mut idx = 1i32;
         let mut arg_builder = sqlx::postgres::PgArguments::default();
+        let mut item_ids: Vec<HashMap<i64, i64>> = Vec::new();
         for (product_id, item) in items.iter() {
             sql_builder.push_str(format!(" (${}, ${}, ${}),", idx, idx + 1, idx + 2).as_str());
             idx += 2;
@@ -46,19 +47,23 @@ impl OrderItems {
             arg_builder.add(order_id);
             arg_builder.add(product_id);
             arg_builder.add(json!(item));
+            item_ids.push(HashMap::from([(product_id.clone(), item.sku_id)]))
         }
 
-        Ok(sqlx::query_with(
-            &*format!(
-                "insert into order_items (order_id,product_id,product_sku) values {}",
-                sql_builder[..sql_builder.len() - 1].to_string()
-            ),
-            arg_builder,
-        )
-        .execute(tx)
-        .await?
-        .rows_affected()
-            == (*item_len as u64))
+        Ok((
+            sqlx::query_with(
+                &*format!(
+                    "insert into order_items (order_id,product_id,product_sku) values {}",
+                    sql_builder[..sql_builder.len() - 1].to_string()
+                ),
+                arg_builder,
+            )
+            .execute(tx)
+            .await?
+            .rows_affected()
+                == item_len,
+            item_ids,
+        ))
     }
 
     // 获取子订单

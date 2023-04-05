@@ -1,13 +1,12 @@
-use std::collections::HashMap;
-
-use serde::{Deserialize, Serialize};
 use serde_json::json;
 use sqlx::Row;
+use std::collections::HashMap;
 
 use common::error::{ApiError, ApiResult};
 use common::Pagination;
 
 use crate::models::order_items::{ItemProductSku, OrderItems};
+use crate::models::product_skus::ProductSku;
 
 #[derive(Debug, sqlx::FromRow)]
 pub struct Orders {
@@ -132,10 +131,14 @@ impl Orders {
             .fetch_one(&mut tx)
             .await?.get::<i64, _>("id");
 
-        if false == OrderItems::create(order_id, order_items, &mut tx).await? {
+        let (bool_val, item_ids): (bool, Vec<HashMap<i64, i64>>) =
+            OrderItems::create(order_id, order_items, &mut tx).await?;
+        if false == bool_val {
             tx.rollback().await?;
             return Err(ApiError::Error("创建商品订单失败".to_string()));
         }
+
+        ProductSku::buckle_inventory(item_ids, -1, &mut tx).await?;
 
         tx.commit().await?;
 

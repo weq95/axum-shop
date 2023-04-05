@@ -1,4 +1,3 @@
-use std::collections::BTreeMap;
 use std::ops::DerefMut;
 use std::sync::Arc;
 
@@ -11,17 +10,13 @@ use axum::{
     Json,
 };
 use http::StatusCode;
-use lapin::{
-    options::{ExchangeDeclareOptions, QueueBindOptions, QueueDeclareOptions},
-    types::{AMQPValue, FieldTable},
-    Channel, ExchangeKind,
-};
 use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use tokio::io::AsyncWriteExt;
 use tracing::{error, info};
 
+use crate::controller::order::DelayOrder;
 use common::error::{ApiError, ApiResult};
 use common::jwt::{Claims, JWT};
 use common::rabbitmq::{MQManager, RabbitMQDlxQueue, RabbitMQQueue};
@@ -202,6 +197,10 @@ lazy_static! {
             .add_normal_queue(Arc::new(Box::new(CommQueue::default())))
             .await;
 
+        mq_mamnger
+            .add_dlx_queue(Arc::new(Box::new(DelayOrder::default())))
+            .await;
+
         Arc::new(mq_mamnger)
     });
 }
@@ -246,11 +245,11 @@ impl RabbitMQQueue for CommQueue {
     }
 
     fn router_key(&self) -> &'static str {
-       "normal-queue-router-key"
+        "normal-queue-router-key"
     }
 
     fn exchange_name(&self) -> &'static str {
-       "normal-queue-exchange"
+        "normal-queue-exchange"
     }
 
     fn consumer_tag(&self) -> &'static str {

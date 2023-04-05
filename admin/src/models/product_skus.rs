@@ -130,4 +130,24 @@ impl ProductSku {
             .map(|sku| (sku.product_id, sku))
             .collect::<HashMap<i64, CustomProductSku>>())
     }
+
+    // 扣件库存
+    pub async fn buckle_inventory(
+        item_ids: Vec<HashMap<i64, i64>>,
+        increment: i32,
+        tx: &mut Transaction<'_, Postgres>,
+    ) -> ApiResult<()> {
+        for item in item_ids.into_iter() {
+            for (&product_id, &sku_id) in item.iter() {
+                sqlx::query("update product_skus set stock = stock::INT+$1 where stock >= 0 and product_id = $2 and id = $3")
+                    .bind(increment)
+                    .bind(product_id)
+                    .bind(sku_id)
+                    .execute(&mut *tx)
+                    .await?;
+            }
+        }
+
+        Ok(())
+    }
 }

@@ -2,15 +2,15 @@ use std::collections::{BTreeMap, HashMap};
 use std::sync::Arc;
 
 use futures::StreamExt;
+use lapin::types::AMQPValue;
 use lapin::{
-    BasicProperties,
-    Channel,
-    ExchangeKind, options::{
+    options::{
         BasicAckOptions, BasicConsumeOptions, BasicPublishOptions, ExchangeDeclareOptions,
         QueueBindOptions, QueueDeclareOptions,
-    }, types::FieldTable,
+    },
+    types::FieldTable,
+    BasicProperties, Channel, ExchangeKind,
 };
-use lapin::types::AMQPValue;
 use tracing::{error, info};
 
 /// 队列管理器
@@ -103,26 +103,32 @@ pub trait RabbitMQQueue: Send + Sync {
 
     // 初始化队列
     async fn init_queue(&self, channel: Channel) -> lapin::Result<()> {
-        channel.exchange_declare(
-            self.exchange_name(),
-            ExchangeKind::Direct,
-            ExchangeDeclareOptions::default(),
-            FieldTable::default(),
-        ).await?;
+        channel
+            .exchange_declare(
+                self.exchange_name(),
+                ExchangeKind::Direct,
+                ExchangeDeclareOptions::default(),
+                FieldTable::default(),
+            )
+            .await?;
 
-        let queue = channel.queue_declare(
-            self.queue_name(),
-            QueueDeclareOptions::default(),
-            FieldTable::default(),
-        ).await?;
+        let queue = channel
+            .queue_declare(
+                self.queue_name(),
+                QueueDeclareOptions::default(),
+                FieldTable::default(),
+            )
+            .await?;
 
-        channel.queue_bind(
-            queue.name().as_str(),
-            self.exchange_name(),
-            self.router_key(),
-            QueueBindOptions::default(),
-            FieldTable::default(),
-        ).await?;
+        channel
+            .queue_bind(
+                queue.name().as_str(),
+                self.exchange_name(),
+                self.router_key(),
+                QueueBindOptions::default(),
+                FieldTable::default(),
+            )
+            .await?;
 
         Ok(())
     }
