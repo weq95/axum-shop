@@ -29,6 +29,7 @@ pub struct Orders {
     pub extra: String,
     pub created_at: chrono::NaiveDateTime,
     pub updated_at: chrono::NaiveDateTime,
+    pub coupon_id: i64,
 }
 
 /// 支付方式
@@ -276,13 +277,13 @@ impl Orders {
         Ok(sqlx::query(
             "update order_items set updated_at = $1, address = $2 where id = $3 and user_id = $4",
         )
-        .bind(chrono::Utc::now().naive_utc())
-        .bind(addr)
-        .bind(id)
-        .bind(user_id)
-        .execute(common::postgres().await)
-        .await?
-        .rows_affected()
+            .bind(chrono::Utc::now().naive_utc())
+            .bind(addr)
+            .bind(id)
+            .bind(user_id)
+            .execute(common::postgres().await)
+            .await?
+            .rows_affected()
             > 0)
     }
 
@@ -339,13 +340,23 @@ impl Orders {
         Ok(sqlx::query(
             "update orders set ship_status = $1, updated_at = $2 where id = $3 and user_id = $4",
         )
-        .bind::<i16>(ShipStatus::Received.into())
-        .bind(chrono::Local::now())
-        .bind(id)
-        .bind(userid)
-        .execute(common::postgres().await)
-        .await?
-        .rows_affected()
+            .bind::<i16>(ShipStatus::Received.into())
+            .bind(chrono::Local::now())
+            .bind(id)
+            .bind(userid)
+            .execute(common::postgres().await)
+            .await?
+            .rows_affected()
             > 0)
+    }
+
+    // 订单关联的优惠券
+    pub async fn coupon(&self) -> ApiResult<Option<i64>> {
+        if self.coupon_id <= 0 {
+            return Ok(None);
+        }
+
+        Ok(Some(1))
+
     }
 }

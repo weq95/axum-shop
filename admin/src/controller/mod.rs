@@ -27,6 +27,7 @@ pub mod auth;
 pub mod order;
 pub mod products;
 pub mod user;
+pub mod coupons;
 
 pub struct CommController;
 
