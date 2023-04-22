@@ -58,9 +58,7 @@ pub fn format_errors(errors: ValidationErrors) -> Vec<HashMap<String, String>> {
                 .collect::<Vec<String>>()
                 .join(",");
 
-            let mut map_data = HashMap::new();
-            map_data.insert(field.to_owned(), message);
-            map_data
+            HashMap::from([(field.to_owned(), message)])
         })
         .collect::<Vec<HashMap<String, String>>>()
 }
