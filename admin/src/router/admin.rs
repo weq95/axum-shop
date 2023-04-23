@@ -5,6 +5,7 @@ use tower::ServiceBuilder;
 
 use middleware::casbin::CasbinAuthLayer;
 
+use crate::controller::coupons::CouponController;
 use crate::controller::products::ProductController;
 use crate::controller::{
     address::AddressController, auth::RolePermissionController, order::OrderController,
@@ -124,6 +125,11 @@ pub async fn admin() -> Router {
             ),
     );
 
+    let coupons = Router::new().nest(
+        "/coupons",
+        Router::new().route("/", get(CouponController::index)),
+    );
+
     Router::new().nest(
         "/admin",
         Router::new()
@@ -134,6 +140,7 @@ pub async fn admin() -> Router {
             .merge(auth)
             .merge(products)
             .merge(orders)
+            .merge(coupons)
             .layer(
                 ServiceBuilder::new()
                     .layer(AxumMiddleware::from_fn(middleware::auth_guard))

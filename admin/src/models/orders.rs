@@ -206,13 +206,13 @@ impl Orders {
         let mut sql_total = "select count(*) as total from orders where user_id = $1 ".to_string();
 
         if let Some(start_time) = inner.get("start_time") {
-            sql.push_str(format!(" and created_at >= {} ", start_time).as_str());
-            sql_total.push_str(format!(" and created_at >= {} ", start_time).as_str());
+            sql.push_str(format!(" and created_at >= '{}' ", start_time).as_str());
+            sql_total.push_str(format!(" and created_at >= '{}' ", start_time).as_str());
         }
 
         if let Some(end_time) = inner.get("end_time") {
-            sql.push_str(format!(" and created_at <= {} ", end_time).as_str());
-            sql_total.push_str(format!(" and created_at <= {} ", end_time).as_str());
+            sql.push_str(format!(" and created_at <= '{}' ", end_time).as_str());
+            sql_total.push_str(format!(" and created_at <= '{}' ", end_time).as_str());
         }
 
         sql.push_str(" order by created_at desc limit $2 offset $3");
@@ -230,10 +230,6 @@ impl Orders {
                 let refund_status = row.get::<RefundStatus, _>("refund_status");
                 order_ids.push(order_id);
 
-                let created_at = row
-                    .get::<chrono::NaiveDateTime, _>("created_at")
-                    .format("%Y-%m-%d %H:%M:%S")
-                    .to_string();
                 HashMap::from([
                     ("id".to_string(), serde_json::to_value(order_id).unwrap()),
                     (
@@ -242,7 +238,10 @@ impl Orders {
                     ),
                     (
                         "created_at".to_string(),
-                        serde_json::to_value(created_at).unwrap(),
+                        serde_json::to_value(common::time_ymd_his(
+                            row.get::<chrono::NaiveDateTime, _>("created_at"),
+                        ))
+                        .unwrap(),
                     ),
                 ])
             })
@@ -277,13 +276,13 @@ impl Orders {
         Ok(sqlx::query(
             "update order_items set updated_at = $1, address = $2 where id = $3 and user_id = $4",
         )
-            .bind(chrono::Utc::now().naive_utc())
-            .bind(addr)
-            .bind(id)
-            .bind(user_id)
-            .execute(common::postgres().await)
-            .await?
-            .rows_affected()
+        .bind(chrono::Utc::now().naive_utc())
+        .bind(addr)
+        .bind(id)
+        .bind(user_id)
+        .execute(common::postgres().await)
+        .await?
+        .rows_affected()
             > 0)
     }
 
@@ -340,13 +339,13 @@ impl Orders {
         Ok(sqlx::query(
             "update orders set ship_status = $1, updated_at = $2 where id = $3 and user_id = $4",
         )
-            .bind::<i16>(ShipStatus::Received.into())
-            .bind(chrono::Local::now())
-            .bind(id)
-            .bind(userid)
-            .execute(common::postgres().await)
-            .await?
-            .rows_affected()
+        .bind::<i16>(ShipStatus::Received.into())
+        .bind(chrono::Local::now())
+        .bind(id)
+        .bind(userid)
+        .execute(common::postgres().await)
+        .await?
+        .rows_affected()
             > 0)
     }
 
@@ -357,6 +356,5 @@ impl Orders {
         }
 
         Ok(Some(1))
-
     }
 }

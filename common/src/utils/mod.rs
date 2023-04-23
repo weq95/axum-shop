@@ -125,3 +125,16 @@ pub async fn snow_id() -> u128 {
 pub async fn rabbit_mq() -> Arc<lapin::Connection> {
     RABBITMQ.get().await.clone()
 }
+
+// 格式化年月日,时分秒
+pub fn time_ymd_his(date_time: chrono::NaiveDateTime) -> String {
+    date_time.format("%Y-%m-%d %H:%M:%S").to_string()
+}
+
+// 字符串除去双引号
+pub fn string_trim_yh(value: &serde_json::Value) -> String {
+    let value = serde_json::to_string(value).unwrap();
+    let binding = value.clone();
+
+    binding.trim_matches('"').to_string()
+}

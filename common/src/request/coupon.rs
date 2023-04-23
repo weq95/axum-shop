@@ -11,9 +11,9 @@ pub struct ReqCoupon {
     pub r#type: Option<String>,
     #[validate(required)]
     pub amin: Option<f64>,
-    #[validate(min = 1, message = "total > 0")]
+    #[validate(range(min = 0.01, message = "最低0.01元"))]
     pub total: Option<i64>,
-    #[validate(min = 0.01, message = "使用门槛最低为0.01元")]
+    #[validate(range(min = 0.01, message = "使用门槛最低为0.01元"))]
     pub min_amount: Option<f64>,
     #[validate(required)]
     pub start_time: Option<chrono::NaiveDateTime>,

@@ -2,7 +2,6 @@ use std::collections::HashMap;
 
 use serde::{Deserialize, Serialize};
 use serde_json::json;
-use sqlx::testing::TestTermination;
 use sqlx::{Arguments, Postgres, Row, Transaction};
 use tracing::info;
 

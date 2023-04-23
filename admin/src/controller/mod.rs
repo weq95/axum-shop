@@ -24,10 +24,10 @@ use common::{redis, ApiResponse, SchoolJson, IMAGES_PATH};
 
 pub mod address;
 pub mod auth;
+pub mod coupons;
 pub mod order;
 pub mod products;
 pub mod user;
-pub mod coupons;
 
 pub struct CommController;
 

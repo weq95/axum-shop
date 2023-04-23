@@ -1,11 +1,14 @@
 use std::collections::HashMap;
-use axum::Extension;
+
 use axum::extract::Query;
 use axum::response::IntoResponse;
+use axum::{Extension, Json};
 use serde_json::json;
 
-use common::{ApiResponse, PagePer, Pagination};
+use common::coupon::ReqCoupon;
 use common::jwt::Claims;
+use common::{ApiResponse, PagePer, Pagination};
+
 use crate::models::coupons::Coupons;
 
 pub struct CouponController;
@@ -14,23 +17,13 @@ impl CouponController {
     // 列表
     pub async fn index(
         Query(page_per): Query<PagePer>,
-        Extension(user): Extension<Claims>,
-        Query(inner): Query<HashMap<String, serde_json::Value>>
-    )  -> impl IntoResponse {
+        Query(inner): Query<HashMap<String, serde_json::Value>>,
+    ) -> impl IntoResponse {
         let mut pagination = Pagination::new(vec![], page_per);
-        match Coupons:: { }
-        ApiResponse::response(Some(json!({
-            "id": 1,
-            "name": "",
-            "code": "",
-            "type": "",
-            "value": "",
-            "min_amount": "",
-            "total":100,
-            "used":12,
-            "enable": false,
-            "created_at": "",
-        }))).json()
+        match Coupons::index(inner, &mut pagination).await {
+            Ok(()) => ApiResponse::response(Some(pagination)).json(),
+            Err(e) => ApiResponse::fail_msg(e.to_string()).json(),
+        }
     }
 
     // 详情
@@ -39,7 +32,7 @@ impl CouponController {
     }
 
     // 创建
-    pub async fn store() -> impl IntoResponse {
+    pub async fn store(Json(inner): Json<ReqCoupon>) -> impl IntoResponse {
         todo!()
     }
 
