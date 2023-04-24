@@ -2,12 +2,11 @@ use std::collections::HashMap;
 
 use rand::distributions::Alphanumeric;
 use rand::Rng;
-use regex::Regex;
 use serde::{Deserialize, Serialize};
 use sqlx::postgres::types::PgMoney;
 use sqlx::Row;
 
-use common::error::ApiResult;
+use common::error::{ApiError, ApiResult};
 use common::Pagination;
 
 #[derive(Debug, sqlx::FromRow)]
@@ -39,6 +38,26 @@ pub enum CouponType {
     Percent = 2,
 }
 
+impl From<CouponType> for i16 {
+    fn from(value: CouponType) -> Self {
+        match value {
+            CouponType::Percent => 2,
+            CouponType::Fixed => 1,
+            CouponType::Unknown => 0,
+        }
+    }
+}
+
+impl From<i16> for CouponType {
+    fn from(value: i16) -> Self {
+        match value {
+            1 => Self::Fixed,
+            2 => Self::Percent,
+            _ => Self::Unknown,
+        }
+    }
+}
+
 impl ToString for CouponType {
     fn to_string(&self) -> String {
         match self {
@@ -51,14 +70,20 @@ impl ToString for CouponType {
 
 impl Coupons {
     // 检测优惠码是否存在
-    pub async fn exits(code: &str) -> ApiResult<bool> {
-        Ok(
-            sqlx::query("SELECT EXISTS (SELECT 1 FROM coupons WHERE name = $1) AS exist")
-                .bind(code)
-                .fetch_one(common::postgres().await)
-                .await?
-                .get::<bool, _>("exist"),
-        )
+    pub async fn exits(code: &str, id: Option<i64>) -> ApiResult<bool> {
+        let mut sql_string = " name = $1 and deleted_at is null ".to_string();
+        if let Some(id) = id {
+            sql_string.push_str(format!(" and id != {} ", id).as_str());
+        }
+
+        Ok(sqlx::query(&*format!(
+            "SELECT EXISTS (SELECT 1 FROM coupons WHERE {}) AS exist",
+            sql_string
+        ))
+        .bind(code)
+        .fetch_one(common::postgres().await)
+        .await?
+        .get::<bool, _>("exist"))
     }
 
     // 优惠券code
@@ -73,7 +98,7 @@ impl Coupons {
                 .map(char::from)
                 .collect::<String>();
 
-            if false == Self::exits(&code_str).await? {
+            if false == Self::exits(&code_str, None).await? {
                 break code_str;
             }
         })
@@ -94,6 +119,7 @@ impl Coupons {
         format!("{}减{}", descr_val, value.trunc().to_string().as_str())
     }
 
+    // 列表
     pub async fn index(
         inner: HashMap<String, serde_json::Value>,
         pagination: &mut Pagination<HashMap<String, serde_json::Value>>,
@@ -121,7 +147,7 @@ impl Coupons {
 
         sql.push_str(" order by created_at desc limit $1 offset $2");
 
-        let mut result = sqlx::query(&*sql)
+        let result = sqlx::query(&*sql)
             .bind(pagination.limit())
             .bind(pagination.offset())
             .fetch_all(common::postgres().await)
@@ -189,5 +215,96 @@ impl Coupons {
         pagination.set_data(result);
 
         Ok(())
+    }
+
+    // 创建
+    pub async fn store(
+        name: String,
+        r#type: i16,
+        discount: f64,
+        total: i64,
+        // 单位: 分
+        min_amount: i64,
+        not_before: Option<chrono::NaiveDateTime>,
+        not_after: Option<chrono::NaiveDateTime>,
+        enabled: bool,
+    ) -> ApiResult<i64> {
+        Ok(sqlx::query(
+            "INSERT INTO coupons (name,code,type,value,total,min_amount,not_before,not_after,enabled,created_at)\
+            VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) RETURNING id",
+        )
+            .bind(name)
+            .bind(Self::find_available_code(None).await?)
+            .bind(r#type)
+            .bind(discount)
+            .bind(total)
+            .bind(min_amount)
+            .bind::<Option<chrono::NaiveDateTime>>(not_before)
+            .bind::<Option<chrono::NaiveDateTime>>(not_after)
+            .bind(chrono::Local::now())
+            .bind(enabled)
+            .fetch_one(common::postgres().await)
+            .await?
+            .get::<i64, _>("id"))
+    }
+
+    // 详情
+    pub async fn get(id: i64) -> ApiResult<Coupons> {
+        let result: Coupons =
+            sqlx::query_as("SELECT * FROM coupons where id = $1 and deleted_at is null")
+                .bind(id)
+                .fetch_one(common::postgres().await)
+                .await?;
+
+        Ok(result)
+    }
+
+    // 更新
+    pub async fn update(
+        id: i64,
+        name: String,
+        code: String,
+        r#type: i16,
+        discount: f64,
+        total: i64,
+        // 单位: 分
+        min_amount: i64,
+        not_before: Option<chrono::NaiveDateTime>,
+        not_after: Option<chrono::NaiveDateTime>,
+        enabled: bool,
+    ) -> ApiResult<bool> {
+        if Self::exits(&code.clone(), Some(id)).await? {
+            return Err(ApiError::Error("优惠券码已存在, 请换一个试试".to_string()));
+        }
+
+        Ok(sqlx::query(
+            "UPDATE coupons SET name=$1,code=$2,type=$3,value=$4,total=$5,min_amount=$6,not_before=$7,not_after=$8,enabled=$9 WHERE id=$10"
+        )
+            .bind(name)
+            .bind(code)
+            .bind(r#type)
+            .bind(discount)
+            .bind(total)
+            .bind(min_amount)
+            .bind::<Option<chrono::NaiveDateTime>>(not_before)
+            .bind::<Option<chrono::NaiveDateTime>>(not_after)
+            .bind(enabled)
+            .bind(id)
+            .execute(common::postgres().await)
+            .await?.rows_affected() == 1u64
+        )
+    }
+
+    // 软删除
+    pub async fn delete(id: i64) -> ApiResult<bool> {
+        Ok(
+            sqlx::query("update coupons set deleted_at = $1 where id = $2")
+                .bind(chrono::Local::now().naive_local())
+                .bind(id)
+                .execute(common::postgres().await)
+                .await?
+                .rows_affected()
+                > 0,
+        )
     }
 }

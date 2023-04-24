@@ -127,7 +127,17 @@ pub async fn admin() -> Router {
 
     let coupons = Router::new().nest(
         "/coupons",
-        Router::new().route("/", get(CouponController::index)),
+        Router::new()
+            .route(
+                "/",
+                get(CouponController::index).post(CouponController::create),
+            )
+            .route(
+                "/:id",
+                get(CouponController::get)
+                    .post(CouponController::update)
+                    .delete(CouponController::delete),
+            ),
     );
 
     Router::new().nest(
