@@ -70,7 +70,7 @@ impl ToString for CouponType {
 
 impl Coupons {
     // 检测优惠码是否存在
-    pub async fn exits(code: &str, id: Option<i64>) -> ApiResult<bool> {
+    pub async fn code_exits(code: &str, id: Option<i64>) -> ApiResult<bool> {
         let mut sql_string = " name = $1 and deleted_at is null ".to_string();
         if let Some(id) = id {
             sql_string.push_str(format!(" and id != {} ", id).as_str());
@@ -87,10 +87,13 @@ impl Coupons {
     }
 
     // 优惠券code
-    pub async fn find_available_code(length: Option<u8>) -> ApiResult<String> {
+    async fn find_available_code(length: Option<u8>) -> ApiResult<String> {
         let length = length.unwrap_or(16);
         let rng = rand::thread_rng();
-        Ok(loop {
+        let mut i: u8 = 0;
+        const MAX_NUM: u8 = 25;
+
+        while i < MAX_NUM {
             let code_str: String = rng
                 .clone()
                 .sample_iter(Alphanumeric)
@@ -98,10 +101,14 @@ impl Coupons {
                 .map(char::from)
                 .collect::<String>();
 
-            if false == Self::exits(&code_str, None).await? {
-                break code_str;
+            if false == Self::code_exits(&code_str, None).await? {
+                return Ok(code_str);
             }
-        })
+
+            i += 1;
+        }
+
+        Err(ApiError::Error("生成CODE码失败".to_string()))
     }
 
     // 描述
@@ -234,7 +241,7 @@ impl Coupons {
             VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) RETURNING id",
         )
             .bind(name)
-            .bind(Self::find_available_code(None).await?)
+            .bind(chrono::Local::now().timestamp().to_string())
             .bind(r#type)
             .bind(discount)
             .bind(total)
@@ -273,7 +280,7 @@ impl Coupons {
         not_after: Option<chrono::NaiveDateTime>,
         enabled: bool,
     ) -> ApiResult<bool> {
-        if Self::exits(&code.clone(), Some(id)).await? {
+        if Self::code_exits(&code.clone(), Some(id)).await? {
             return Err(ApiError::Error("优惠券码已存在, 请换一个试试".to_string()));
         }
 
