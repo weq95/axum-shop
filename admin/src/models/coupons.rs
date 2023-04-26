@@ -314,4 +314,34 @@ impl Coupons {
                 > 0,
         )
     }
+
+    // 检测优惠券是否有效
+    pub async fn is_in_effect(code: String) -> ApiResult<bool> {
+        let row = sqlx::query("SELECT code,enabled,total,used,not_after,not_before FROM coupons WHERE code = $1 and deleted_at is NULL")
+            .bind(code)
+            .fetch_optional(common::postgres().await)
+            .await?
+            .ok_or(ApiError::Error("Not Found".to_string()))?;
+
+        if false == row.get::<bool, _>("enabled") {
+            return Err(ApiError::Error("优惠券不存在".to_string()));
+        }
+
+        if (row.get::<i64, _>("total") - row.get::<i64, _>("used")) <= 0 {
+            return Err(ApiError::Error("该优惠券已被兑完".to_string()));
+        }
+
+        if let Some(not_before) = row.get::<Option<chrono::NaiveDateTime>, _>("not_before") {
+            if not_before.gt(&chrono::Local::now().naive_local()) {
+                return Err(ApiError::Error("该优惠券现在还不能使用".to_string()));
+            }
+        }
+        if let Some(not_after) = row.get::<Option<chrono::NaiveDateTime>, _>("not_after") {
+            if not_after.lt(&chrono::Local::now().naive_local()) {
+                return Err(ApiError::Error("该优惠券已过期".to_string()));
+            }
+        }
+
+        Ok(true)
+    }
 }
