@@ -8,7 +8,7 @@ pub struct ReqCoupon {
     pub name: Option<String>,
     pub code: Option<String>,
     #[validate(required)]
-    pub r#type: Option<i16>,
+    pub c_type: Option<i16>,
     #[validate(required)]
     pub value: Option<f64>,
     #[validate(range(min = 1, message = "可发行数不能 < 1"))]

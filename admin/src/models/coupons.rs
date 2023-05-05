@@ -86,20 +86,25 @@ impl Coupons {
         .get::<bool, _>("exist"))
     }
 
+    // 生成指定位数随机字符串
+    fn rand_string(length: Option<u8>) -> String {
+        let length = length.unwrap_or(16);
+        let mut rng = rand::thread_rng();
+
+        (0..length)
+            .map(|_| rng.gen_range(0..length))
+            .map(|n| format!("{:x}", n))
+            .collect::<String>()
+            .to_uppercase()
+    }
+
     // 优惠券code
     async fn find_available_code(length: Option<u8>) -> ApiResult<String> {
-        let length = length.unwrap_or(16);
-        let rng = rand::thread_rng();
         let mut i: u8 = 0;
         const MAX_NUM: u8 = 25;
 
         while i < MAX_NUM {
-            let code_str: String = rng
-                .clone()
-                .sample_iter(Alphanumeric)
-                .take(length as usize)
-                .map(char::from)
-                .collect::<String>();
+            let code_str = Self::rand_string(length);
 
             if false == Self::code_exits(&code_str, None).await? {
                 return Ok(code_str);
@@ -237,19 +242,19 @@ impl Coupons {
         enabled: bool,
     ) -> ApiResult<i64> {
         Ok(sqlx::query(
-            "INSERT INTO coupons (name,code,type,value,total,min_amount,not_before,not_after,enabled,created_at)\
+            "INSERT INTO coupons (name,code,type,value,total,min_amount,enabled,not_before,not_after,created_at)\
             VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) RETURNING id",
         )
             .bind(name)
-            .bind(chrono::Local::now().timestamp().to_string())
+            .bind(Self::find_available_code(None).await?)
             .bind(r#type)
             .bind(discount)
             .bind(total)
             .bind(min_amount)
+            .bind(enabled)
             .bind::<Option<chrono::NaiveDateTime>>(not_before)
             .bind::<Option<chrono::NaiveDateTime>>(not_after)
             .bind(chrono::Local::now())
-            .bind(enabled)
             .fetch_one(common::postgres().await)
             .await?
             .get::<i64, _>("id"))

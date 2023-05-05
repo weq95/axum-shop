@@ -56,7 +56,7 @@ impl CouponController {
         }
 
         if let Some(value) = inner.value {
-            let r#type = inner.r#type.unwrap();
+            let r#type = inner.c_type.unwrap();
             if r#type == <CouponType as Into<i16>>::into(CouponType::Fixed) {
                 if value < 0.01f64 {
                     return ApiResponse::fail_msg("免费金额必须 >= 0.01 元".to_string()).json();
@@ -82,7 +82,7 @@ impl CouponController {
         };
         match Coupons::store(
             inner.name.clone().unwrap(),
-            inner.r#type.unwrap(),
+            inner.c_type.unwrap(),
             inner.value.unwrap(),
             inner.total.unwrap(),
             (inner.min_amount.unwrap() * 100.0) as i64,
@@ -112,7 +112,7 @@ impl CouponController {
         }
 
         if let Some(value) = inner.value {
-            let r#type = inner.r#type.unwrap();
+            let r#type = inner.c_type.unwrap();
             if r#type == <CouponType as Into<i16>>::into(CouponType::Fixed) {
                 if value < 0.01f64 {
                     return ApiResponse::fail_msg("免费金额必须 >= 0.01 元".to_string()).json();
@@ -142,7 +142,7 @@ impl CouponController {
             id,
             inner.name.clone().unwrap(),
             inner.code.unwrap(),
-            inner.r#type.unwrap(),
+            inner.c_type.unwrap(),
             inner.value.unwrap(),
             inner.total.unwrap(),
             min_amount,
