@@ -100,20 +100,13 @@ impl Coupons {
 
     // 优惠券code
     async fn find_available_code(length: Option<u8>) -> ApiResult<String> {
-        let mut i: u8 = 0;
-        const MAX_NUM: u8 = 25;
-
-        while i < MAX_NUM {
+        loop {
             let code_str = Self::rand_string(length);
 
             if false == Self::code_exits(&code_str, None).await? {
                 return Ok(code_str);
             }
-
-            i += 1;
         }
-
-        Err(ApiError::Error("生成CODE码失败".to_string()))
     }
 
     // 描述
