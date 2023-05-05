@@ -6,6 +6,7 @@ use sqlx::Row;
 use common::error::{ApiError, ApiResult};
 use common::Pagination;
 
+use crate::models::coupons::Coupons;
 use crate::models::order_items::{ItemProductSku, OrderItems};
 use crate::models::product_skus::ProductSku;
 
@@ -153,9 +154,16 @@ impl Orders {
         total_money: i64,
         address: sqlx::types::Json<HashMap<String, serde_json::Value>>,
         remark: String,
+        coupon_code: Option<String>,
         order_items: HashMap<i64, ItemProductSku>,
     ) -> ApiResult<i64> {
         let mut tx = common::postgres().await.begin().await?;
+        if let Some(code) = coupon_code {
+            if false == Coupons::use_coupon(code, &mut tx).await? {
+                return Err(ApiError::Error("此优惠券不符合使用条件".to_string()));
+            }
+        }
+
         let ship_data: Vec<HashMap<String, serde_json::Value>> = Vec::new();
         let order_id = sqlx::query(
             "INSERT INTO orders (no,user_id,address,total_amount,remark,ship_status,ship_data) VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING id"

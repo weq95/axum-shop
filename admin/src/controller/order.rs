@@ -15,6 +15,7 @@ use common::rabbitmq::{RabbitMQDlxQueue, RabbitMQQueue};
 use common::{ApiResponse, PagePer, Pagination};
 
 use crate::models::address::UserAddress;
+use crate::models::coupons::Coupons;
 use crate::models::order_items::{ItemProductSku, OrderItems};
 use crate::models::orders::Orders;
 use crate::models::product_skus::ProductSku;
@@ -147,12 +148,26 @@ impl OrderController {
                 }
             }
         }
-
+        let mut coupon_code: Option<String> = None;
+        if let Some(code) = inner.coupon_code {
+            coupon_code = Some(code.clone());
+            match Coupons::is_in_effect(code, Some(total_money)).await {
+                Ok(bool_val) => {
+                    if false == bool_val {
+                        return ApiResponse::fail_msg("此优惠券不能使用".to_string()).json();
+                    }
+                }
+                Err(e) => {
+                    return ApiResponse::fail_msg(e.to_string()).json();
+                }
+            }
+        }
         let result = Orders::create(
             user.id,
             total_money,
             sqlx::types::Json(address),
             inner.remark.unwrap(),
+            coupon_code,
             order_items,
         )
         .await;
@@ -272,7 +287,6 @@ impl OrderController {
     // 商品评价列表
     pub async fn evaluate_list(
         Query(page_per): Query<PagePer>,
-        Extension(claims): Extension<Claims>,
         Path(product_id): Path<i64>,
     ) -> impl IntoResponse {
         let mut pagination: Pagination<HashMap<String, serde_json::Value>> =

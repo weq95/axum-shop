@@ -13,6 +13,7 @@ pub struct ReqCreateOrder {
     pub address_id: Option<i64>,
     #[validate(length(min = 0, max = 255, message = "备注信息不能超过255个字符"))]
     pub remark: Option<String>,
+    pub coupon_code: Option<String>,
 }
 
 #[derive(Validate, Deserialize, Serialize, Clone)]

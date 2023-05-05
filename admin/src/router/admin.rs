@@ -137,7 +137,8 @@ pub async fn admin() -> Router {
                 get(CouponController::get)
                     .post(CouponController::update)
                     .delete(CouponController::delete),
-            ),
+            )
+            .route("/:id/:code", post(CouponController::show)),
     );
 
     Router::new().nest(

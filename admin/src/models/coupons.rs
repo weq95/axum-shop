@@ -1,10 +1,9 @@
 use std::collections::HashMap;
 
-use rand::distributions::Alphanumeric;
 use rand::Rng;
 use serde::{Deserialize, Serialize};
 use sqlx::postgres::types::PgMoney;
-use sqlx::Row;
+use sqlx::{Postgres, Row, Transaction};
 
 use common::error::{ApiError, ApiResult};
 use common::Pagination;
@@ -314,12 +313,15 @@ impl Coupons {
     }
 
     // 检测优惠券是否有效
-    pub async fn is_in_effect(code: String) -> ApiResult<bool> {
-        let row = sqlx::query("SELECT code,enabled,total,used,not_after,not_before FROM coupons WHERE code = $1 and deleted_at is NULL")
-            .bind(code)
-            .fetch_optional(common::postgres().await)
-            .await?
-            .ok_or(ApiError::Error("Not Found".to_string()))?;
+    pub async fn is_in_effect(code: String, amount: Option<i64>) -> ApiResult<bool> {
+        let row = sqlx::query(
+            "SELECT code,enabled,total,used,not_after,not_before,min_amount \
+        FROM coupons WHERE code = $1 and deleted_at is NULL",
+        )
+        .bind(code)
+        .fetch_optional(common::postgres().await)
+        .await?
+        .ok_or(ApiError::Error("Not Found".to_string()))?;
 
         if false == row.get::<bool, _>("enabled") {
             return Err(ApiError::Error("优惠券不存在".to_string()));
@@ -340,6 +342,20 @@ impl Coupons {
             }
         }
 
+        if let Some(amount) = amount {
+            if row.get::<PgMoney, _>("min_amount").0 >= amount {
+                return Err(ApiError::Error("订单金额不满足优惠券使用条件".to_string()));
+            }
+        }
+
         Ok(true)
+    }
+
+    // 使用优惠券
+    pub async fn use_coupon(code: String, tx: &mut Transaction<'_, Postgres>) -> ApiResult<bool> {
+        Ok(sqlx::query("UPDATE coupons SET used = used + 1 WHERE used < total AND code = $1 and deleted_at IS NULL")
+            .bind(code)
+            .execute(tx)
+            .await?.rows_affected() > 0)
     }
 }

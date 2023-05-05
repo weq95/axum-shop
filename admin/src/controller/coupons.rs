@@ -6,7 +6,7 @@ use serde_json::json;
 use validator::Validate;
 
 use common::coupon::ReqCoupon;
-use common::{ApiResponse, PagePer, Pagination};
+use common::{parse_field, ApiResponse, PagePer, Pagination};
 
 use crate::models::coupons::{CouponType, Coupons};
 
@@ -167,6 +167,14 @@ impl CouponController {
                 "bool_val": bool_val,
             })))
             .json(),
+            Err(e) => ApiResponse::fail_msg(e.to_string()).json(),
+        }
+    }
+
+    // 优惠券状态
+    pub async fn show(Path((_, code)): Path<(i64, String)>) -> impl IntoResponse {
+        match Coupons::is_in_effect(code, None).await {
+            Ok(bool_val) => ApiResponse::response(Some(json!({ "status": bool_val }))).json(),
             Err(e) => ApiResponse::fail_msg(e.to_string()).json(),
         }
     }
