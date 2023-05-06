@@ -11,7 +11,7 @@ use validator::Validate;
 
 use common::error::format_errors;
 use common::jwt::Claims;
-use common::response::user::GetUser;
+
 use common::{
     jwt::{UserSource, UserType, JWT},
     request::user::{ReqCrateUser, ReqGetUser, ReqLogin, ReqUpdateUser},
@@ -104,7 +104,7 @@ impl AdminController {
     /// 用户详情
     pub async fn get(
         Extension(user): Extension<Claims>,
-        Json(inner): Json<ReqGetUser>,
+        Json(_inner): Json<ReqGetUser>,
     ) -> impl IntoResponse {
         ApiResponse::response(Some(json!({
             "id": user.id,

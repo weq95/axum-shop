@@ -6,7 +6,7 @@ use serde_json::json;
 use validator::Validate;
 
 use common::coupon::ReqCoupon;
-use common::{parse_field, ApiResponse, PagePer, Pagination};
+use common::{ApiResponse, PagePer, Pagination};
 
 use crate::models::coupons::{CouponType, Coupons};
 
