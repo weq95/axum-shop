@@ -139,7 +139,7 @@ mod test {
     use tokio::spawn;
 
     use crate::utils::snowflake::SnowflakeIdWorker;
-    use crate::*;
+    
 
     const WORKER_ID: u128 = 1;
     const DATA_CENTER_ID: u128 = 1;
