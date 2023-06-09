@@ -4,7 +4,6 @@ use serde::{Deserialize, Serialize};
 use serde_json::json;
 use sqlx::{Arguments, Postgres, Row, Transaction};
 
-
 use common::error::ApiResult;
 use common::Pagination;
 

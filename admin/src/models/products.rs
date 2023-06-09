@@ -107,6 +107,16 @@ impl Product {
             }
         }
 
+        if let Some(cid) = payload.get("category_id") {
+            let category_id = cid.parse::<i64>().unwrap_or(0);
+            if category_id > 0 {
+                let sql = format!(" and category_id in (SELECT id FROM categories  WHERE id = {} or path like '%{}%' and deleted_at is NULL)",
+                                  category_id, category_id);
+                sql_str.push_str(&sql);
+                count_str.push_str(&sql);
+            }
+        }
+
         sql_str.push_str(&format!(
             " limit {} offset {}",
             pagination.limit(),
@@ -132,7 +142,7 @@ impl Product {
             .collect::<Vec<Self>>();
 
         for product in result.iter_mut() {
-            product.image_preview_url().await.skus().await?
+            product.image_preview_url().await;
         }
         let count = sqlx::query(&*count_str)
             .fetch_one(common::postgres().await)

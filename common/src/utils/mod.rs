@@ -18,6 +18,7 @@ pub mod pwd;
 pub mod rabbitmq;
 pub mod redis;
 pub(crate) mod snowflake;
+pub(crate) mod tree;
 
 /// 图片存储跟路径
 pub const IMAGES_PATH: &str = "./files/images/";

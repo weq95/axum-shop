@@ -169,7 +169,6 @@ pub struct RabbitMQConfig {
 #[cfg(test)]
 mod test {
     use crate::application::Application;
-    
 
     #[tokio::test]
     async fn init() {
