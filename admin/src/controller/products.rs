@@ -12,6 +12,7 @@ use validator::ValidationError;
 use common::{ApiResponse, PagePer, Pagination};
 
 use crate::models::cart_items::CartItems;
+use crate::models::categories::Categories;
 use crate::models::favorite_products::FavoriteProducts;
 use crate::models::product_skus::ProductSku;
 use crate::models::products::Product;
@@ -91,6 +92,15 @@ impl ProductController {
             })
         }
 
+        match Categories::exits(payload.category_id.unwrap()).await {
+            Err(e) => return ApiResponse::fail_msg(e.to_string()).json(),
+            Ok(bool_val) => {
+                if !bool_val {
+                    return ApiResponse::fail_msg("商品类目不存在".to_string()).json();
+                }
+            }
+        }
+
         match Product::unique_title(&payload.title.clone().unwrap()).await {
             Ok(bool_val) => {
                 if bool_val {
@@ -108,6 +118,7 @@ impl ProductController {
             image: payload.image.clone().unwrap(),
             on_sale: payload.on_sale.unwrap(),
             skus,
+            category_id: payload.category_id.unwrap(),
             ..Product::default()
         })
         .await;
@@ -216,6 +227,8 @@ pub struct ReqProduct {
     pub on_sale: Option<bool>,
     #[validate(required)]
     pub skus: Option<Vec<ReqProductSku>>,
+    #[validate(range(min = 1, message = "请选择类目"))]
+    pub category_id: Option<i64>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Validate)]

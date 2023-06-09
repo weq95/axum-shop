@@ -23,6 +23,7 @@ pub struct Product {
     pub review_count: i32,
     pub price: f64,
     pub skus: Vec<ProductSku>,
+    pub category_id: i64,
 }
 
 impl Product {
@@ -37,15 +38,18 @@ impl Product {
             .unwrap();
 
         let id = sqlx::query(
-            "insert into products (title, description, image, on_sale, sku_price) values ($1, $2, $3, $4, $5) RETURNING id",
+            "insert into products (title,description,image,on_sale,sku_price,category_id) \
+            values ($1, $2, $3, $4, $5, $6) RETURNING id",
         )
-            .bind(&product.title.clone())
-            .bind(&product.description.clone())
-            .bind(product.image.clone())
-            .bind(&product.on_sale.clone())
-            .bind(product_sku.price)
-            .fetch_one(&mut tx)
-            .await?.get::<i64, _>("id");
+        .bind(&product.title.clone())
+        .bind(&product.description.clone())
+        .bind(product.image.clone())
+        .bind(&product.on_sale.clone())
+        .bind(product_sku.price)
+        .bind(product.category_id)
+        .fetch_one(&mut tx)
+        .await?
+        .get::<i64, _>("id");
 
         ProductSku::delete_product_sku(id, &mut tx).await?;
 
@@ -76,6 +80,7 @@ impl Product {
                     sold_count: row.get::<i64, _>("sold_count"),
                     review_count: row.get::<i32, _>("review_count"),
                     price: row.get::<f64, _>("sku_price"),
+                    category_id: row.get::<i64, _>("category_id"),
                     skus: Vec::default(),
                 })
                 .ok_or(ApiError::Error("NotFound".to_string()))?;
@@ -137,6 +142,7 @@ impl Product {
                 sold_count: row.get::<i64, _>("sold_count"),
                 review_count: row.get::<i32, _>("review_count"),
                 price: row.get::<f64, _>("sku_price"),
+                category_id: row.get::<i64, _>("category_id"),
                 skus: Vec::default(),
             })
             .collect::<Vec<Self>>();

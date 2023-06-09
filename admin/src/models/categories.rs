@@ -3,7 +3,7 @@ use serde_json::{json, Value};
 use sqlx::Row;
 
 use common::error::{ApiError, ApiResult};
-use tree::{Node, NodeTrait};
+use common::tree::{Node, NodeTrait};
 
 #[derive(Debug, Serialize, Deserialize, sqlx::FromRow, Default, Clone)]
 pub struct Categories {
@@ -102,6 +102,20 @@ impl Categories {
         }
 
         self.level = 0;
+    }
+
+    pub async fn exits(category_id: i64) -> ApiResult<bool> {
+        if category_id <= 0 {
+            return Ok(false);
+        }
+
+        Ok(sqlx::query(
+            "select exists (select id from categories where id = $1 and deleted_at is null)",
+        )
+        .bind(category_id)
+        .fetch_one(&*common::postgres().await)
+        .await?
+        .get::<bool, _>("exists"))
     }
 }
 
