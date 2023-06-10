@@ -1,12 +1,12 @@
 use std::collections::HashMap;
 
-use axum::extract::Query;
+use axum::extract::{Path, Query};
 use axum::response::IntoResponse;
 use axum::Json;
 use serde_json::json;
 use validator::Validate;
 
-use common::categories::ReqCategories;
+use common::categories::{ReqCategories, UpdateCategories};
 use common::error::format_errors;
 use common::ApiResponse;
 
@@ -40,6 +40,55 @@ impl CategoriesController {
         };
         match category.store().await {
             Ok(id) => ApiResponse::response(Some(json!({ "id": id }))).json(),
+            Err(e) => ApiResponse::fail_msg(e.to_string()).json(),
+        }
+    }
+
+    pub async fn get(Path(id): Path<i64>) -> impl IntoResponse {
+        if id <= 0 {
+            return ApiResponse::fail_msg("类目不存在".to_string()).json();
+        }
+
+        match Categories::get(id).await {
+            Ok(Some(category)) => ApiResponse::response(Some(category)).json(),
+            Err(e) => ApiResponse::fail_msg(e.to_string()).json(),
+            _ => ApiResponse::fail_msg("类目不存在".to_string()).json(),
+        }
+    }
+
+    pub async fn update(
+        Path(id): Path<i64>,
+        Json(inner): Json<UpdateCategories>,
+    ) -> impl IntoResponse {
+        if let Err(e) = inner.validate() {
+            return ApiResponse::success_code_data(
+                common::response::FAIL,
+                Some(json!(format_errors(e))),
+            )
+            .json();
+        }
+
+        match Categories::get(id).await {
+            Ok(Some(this)) => match this.update(&inner.name.unwrap()).await {
+                Ok(bool_val) => {
+                    return ApiResponse::response(Some(json!({ "status": bool_val }))).json();
+                }
+                Err(e) => return ApiResponse::fail_msg(e.to_string()).json(),
+            },
+            _ => {
+                return ApiResponse::fail_msg("类目不存在".to_string()).json();
+            }
+            Err(e) => return ApiResponse::fail_msg(e.to_string()).json(),
+        }
+    }
+
+    pub async fn delete(Path(id): Path<i64>) -> impl IntoResponse {
+        if id <= 0 {
+            return ApiResponse::fail_msg("删除失败，类目不存在".to_string()).json();
+        }
+
+        match Categories::delete(id).await {
+            Ok(bool_val) => ApiResponse::response(Some(json!({ "status": bool_val }))).json(),
             Err(e) => ApiResponse::fail_msg(e.to_string()).json(),
         }
     }

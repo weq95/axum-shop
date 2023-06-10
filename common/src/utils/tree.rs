@@ -11,8 +11,8 @@ pub trait Node {
     fn get_data(&self) -> Value;
 }
 
-pub trait NodeTrait<T: Clone + Node + Debug> {
-    fn build_tree(data: &mut [T], mut pid: i64) -> Vec<Value> {
+pub trait NodeTrait<T: Clone + Node> {
+    fn build_tree(data: &mut [T], pid: i64) -> Vec<Value> {
         let mut tree: Vec<Value> = Vec::new();
         if data.len() == 0 {
             return tree;

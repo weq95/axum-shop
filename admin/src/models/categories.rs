@@ -51,23 +51,28 @@ impl Categories {
         Ok(Self::build_tree(&mut result, category_id))
     }
 
-    pub async fn get(category_id: i64) -> ApiResult<Option<Categories>> {
-        if category_id <= 0 {
+    pub async fn get(id: i64) -> ApiResult<Option<Categories>> {
+        if id <= 0 {
             return Ok(None);
         }
         let result: Option<Categories> =
             sqlx::query_as("select * from categories where id = $1 and deleted_at is null")
-                .bind(category_id)
+                .bind(id)
                 .fetch_optional(&*common::postgres().await)
                 .await?;
 
         Ok(result)
     }
 
-    pub async fn unique_name(name: &str) -> ApiResult<bool> {
-        Ok(sqlx::query(
-            "select exists (select id from categories where name = $1 and deleted_at is null)",
-        )
+    pub async fn unique_name(name: &str, this_id: Option<i64>) -> ApiResult<bool> {
+        let mut sql = "".to_string();
+        if let Some(id) = this_id {
+            sql.push_str(format!(" and id != {} ", id).as_str())
+        }
+        Ok(sqlx::query(&*format!(
+            "select exists (select id from categories where name = $1 {} and deleted_at is null)",
+            sql
+        ))
         .bind(name)
         .fetch_one(&*common::postgres().await)
         .await?
@@ -76,7 +81,7 @@ impl Categories {
 
     // 创建
     pub async fn store(mut self) -> ApiResult<i64> {
-        if Self::unique_name(&self.name).await? {
+        if Self::unique_name(&self.name, None).await? {
             return Err(ApiError::Error("类目名称已存在, 请换一个试试!".to_string()));
         }
 
@@ -104,6 +109,18 @@ impl Categories {
         self.level = 0;
     }
 
+    // 是否有子类目
+    pub async fn is_children(id: i64) -> ApiResult<bool> {
+        Ok(
+            sqlx::query("select exists (select id from categories where parent_id = $1)")
+                .bind(id)
+                .fetch_one(&*common::postgres().await)
+                .await?
+                .get::<bool, _>("exists"),
+        )
+    }
+
+    // 类目是否存在
     pub async fn exits(category_id: i64) -> ApiResult<bool> {
         if category_id <= 0 {
             return Ok(false);
@@ -116,6 +133,51 @@ impl Categories {
         .fetch_one(&*common::postgres().await)
         .await?
         .get::<bool, _>("exists"))
+    }
+
+    pub async fn update(self, name: &str) -> ApiResult<bool> {
+        if Self::unique_name(name, Some(self.id)).await? {
+            return Err(ApiError::Error("类目名称已存在，请换一个试试".to_string()));
+        }
+
+        Ok(
+            sqlx::query("update categories set name = $1, updated_at = $2 where id = $3")
+                .bind(name)
+                .bind(chrono::Local::now())
+                .bind(self.id)
+                .execute(&*common::postgres().await)
+                .await?
+                .rows_affected()
+                > 0,
+        )
+    }
+
+    // 类目是否商品使用
+    pub async fn is_use_product(category_id: i64) -> ApiResult<bool> {
+        Ok(
+            sqlx::query("select exists (select id from products where category_id = $1 limit 1)")
+                .bind(category_id)
+                .fetch_one(&*common::postgres().await)
+                .await?
+                .get::<bool, _>("exists"),
+        )
+    }
+
+    pub async fn delete(id: i64) -> ApiResult<bool> {
+        if Self::is_use_product(id).await? {
+            return Err(ApiError::Error("正在使用中...".to_string()));
+        }
+
+        if Self::is_children(id).await? {
+            return Err(ApiError::Error("请先删除子类目".to_string()));
+        }
+
+        Ok(sqlx::query("delete from categories where id = $1")
+            .bind(id)
+            .execute(&*common::postgres().await)
+            .await?
+            .rows_affected()
+            > 0)
     }
 }
 

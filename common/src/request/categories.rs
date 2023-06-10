@@ -8,3 +8,9 @@ pub struct ReqCategories {
     #[validate(length(min = 2, max = 30, message = "内部名称必须在2-30个字符之间"))]
     pub name: Option<String>,
 }
+
+#[derive(Deserialize, Serialize, Validate)]
+pub struct UpdateCategories {
+    #[validate(length(min = 2, max = 30, message = "内部名称必须在2-30个字符之间"))]
+    pub name: Option<String>,
+}

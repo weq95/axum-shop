@@ -144,10 +144,17 @@ pub async fn admin() -> Router {
 
     let categories = Router::new().nest(
         "/categories",
-        Router::new().route(
-            "/",
-            get(CategoriesController::index).post(CategoriesController::create),
-        ),
+        Router::new()
+            .route(
+                "/",
+                get(CategoriesController::index).post(CategoriesController::create),
+            )
+            .route(
+                "/:id",
+                get(CategoriesController::get)
+                    .patch(CategoriesController::update)
+                    .delete(CategoriesController::delete),
+            ),
     );
 
     Router::new().nest(
