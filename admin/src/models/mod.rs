@@ -3,6 +3,7 @@ pub mod auth;
 pub mod cart_items;
 pub mod categories;
 pub mod coupons;
+pub mod crowdfunding;
 pub mod favorite_products;
 pub mod order_items;
 pub mod orders;

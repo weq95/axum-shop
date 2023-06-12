@@ -8,6 +8,7 @@ use sqlx::Row;
 use common::error::{ApiError, ApiResult};
 use common::Pagination;
 
+use crate::models::crowdfunding::CrowdfundingProduct;
 use crate::models::favorite_products::FavoriteProducts;
 use crate::models::product_skus::ProductSku;
 
@@ -24,6 +25,20 @@ pub struct Product {
     pub price: f64,
     pub skus: Vec<ProductSku>,
     pub category_id: i64,
+    pub r#type: PType,
+}
+
+#[repr(i16)]
+#[derive(Debug, Serialize, Deserialize, PartialEq, sqlx::Type)]
+pub enum PType {
+    Normal = 1,
+    Crowdfunding = 2,
+}
+
+impl Default for PType {
+    fn default() -> Self {
+        Self::Normal
+    }
 }
 
 impl Product {
@@ -82,6 +97,7 @@ impl Product {
                     price: row.get::<f64, _>("sku_price"),
                     category_id: row.get::<i64, _>("category_id"),
                     skus: Vec::default(),
+                    r#type: row.get::<PType, _>("type"),
                 })
                 .ok_or(ApiError::Error("NotFound".to_string()))?;
 
@@ -144,6 +160,7 @@ impl Product {
                 price: row.get::<f64, _>("sku_price"),
                 category_id: row.get::<i64, _>("category_id"),
                 skus: Vec::default(),
+                r#type: row.get::<PType, _>("type"),
             })
             .collect::<Vec<Self>>();
 
@@ -296,6 +313,24 @@ impl Product {
                 })
                 .map(|row| (row.get("id").unwrap().as_i64().unwrap(), row))
                 .collect::<HashMap<i64, serde_json::Value>>(),
+        )
+    }
+
+    pub async fn crowdfunding(&self) -> ApiResult<Option<CrowdfundingProduct>> {
+        Ok(
+            sqlx::query("select * from crowdfunding_products where product_id = $1")
+                .bind(self.id)
+                .fetch_optional(&*common::postgres().await)
+                .await?
+                .map(|row| CrowdfundingProduct {
+                    id: row.get::<i64, _>("id"),
+                    product_id: row.get::<i64, _>("product_id"),
+                    target_amount: row.get::<sqlx::postgres::types::PgMoney, _>("target_amount"),
+                    total_amount: row.get::<sqlx::postgres::types::PgMoney, _>("total_amount"),
+                    user_count: row.get::<i32, _>("user_count"),
+                    end_at: row.get::<chrono::NaiveDateTime, _>("end_at"),
+                    status: row.get::<crate::models::crowdfunding::Status, _>("status"),
+                }),
         )
     }
 }
