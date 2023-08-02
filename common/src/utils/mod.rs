@@ -139,3 +139,21 @@ pub fn string_trim_yh(value: &serde_json::Value) -> String {
 
     binding.trim_matches('"').to_string()
 }
+
+fn bubble_sort<T: Ord>(arr: &mut [T]) {
+    for i in 0..arr.len() {
+        for j in 0..arr.len() - 1 - i {
+            if arr[i] > arr[j + 1] {
+                arr.swap(j, j + 1);
+            }
+        }
+    }
+}
+
+fn fibonacci(n: u32) -> u32 {
+    if n == 0 || n == 1 {
+        return n;
+    }
+
+    fibonacci(n - 1) + fibonacci(n - 2)
+}
