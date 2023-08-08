@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::sync::Arc;
 
 use async_once::AsyncOnce;
@@ -48,6 +49,9 @@ pub struct Application {
     pub postgres: PostgresConfig,
     pub redis: RedisConfig,
     pub rabbitmq: RabbitMQConfig,
+    pub installment_fee_rate: HashMap<u8, f32>,
+    pub min_installment_amount: f32,
+    pub installment_fine_rate: f32,
 }
 
 #[async_trait]
@@ -87,6 +91,9 @@ impl Application {
             postgres: Self::analysis::<PostgresConfig>("postgres", &cfg)?,
             redis: Self::analysis::<RedisConfig>("redis", &cfg)?,
             rabbitmq: Self::analysis::<RabbitMQConfig>("rabbit", &cfg)?,
+            installment_fee_rate: Self::analysis::<HashMap<u8, f32>>("installment_fee_rate", &cfg)?,
+            min_installment_amount: Self::analysis::<f32>("min_installment_amount", &cfg)?,
+            installment_fine_rate: Self::analysis::<f32>("installment_fine_rate", &cfg)?,
         })
     }
 

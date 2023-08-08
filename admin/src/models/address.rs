@@ -27,7 +27,7 @@ pub struct UserAddress {
 impl UserAddress {
     /// 用户收获地址详情
     pub async fn get(id: i64, userid: i64) -> ApiResult<UserAddress> {
-        Ok(sqlx::query(
+        sqlx::query(
             r#"SELECT id,user_id,province,city,street,district,address,zip,contact_name,contact_phone,
     last_used_at,created_at,updated_at FROM user_address WHERE id = $1 and user_id = $2"#,
         )
@@ -50,7 +50,7 @@ impl UserAddress {
                 crated_at: row.get::<DateTime<Utc>, &str>("created_at").naive_local(),
                 updated_at: row.get::<DateTime<Utc>, &str>("updated_at").naive_local(),
             })
-            .unwrap_or(UserAddress::default()))
+            .ok_or(ApiError::Error("Not Found".to_string()))
     }
 
     /// 用户收获地址列表

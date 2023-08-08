@@ -1,24 +1,31 @@
 use std::collections::HashMap;
 
-use axum::extract::{Path, Query};
-use axum::response::IntoResponse;
-use axum::{Extension, Json};
+use axum::{
+    extract::{Path, Query},
+    response::IntoResponse,
+    Extension, Json,
+};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use tracing::{error, info};
 use validator::Validate;
 
-use common::error::format_errors;
-use common::jwt::Claims;
-use common::order::{OrderEvaluate, OrderShip, ReqCreateOrder};
-use common::rabbitmq::{RabbitMQDlxQueue, RabbitMQQueue};
-use common::{ApiResponse, PagePer, Pagination};
+use common::{
+    error::format_errors,
+    jwt::Claims,
+    order::{OrderEvaluate, OrderShip, ReqCreateOrder, ReqInstallments},
+    rabbitmq::{RabbitMQDlxQueue, RabbitMQQueue},
+    ApiResponse, PagePer, Pagination,
+};
 
-use crate::models::address::UserAddress;
-use crate::models::coupons::Coupons;
-use crate::models::order_items::{ItemProductSku, OrderItems};
-use crate::models::orders::Orders;
-use crate::models::product_skus::ProductSku;
+use crate::models::{
+    address::UserAddress,
+    coupons::Coupons,
+    installments::{Installments, Status},
+    order_items::{ItemProductSku, OrderItems},
+    orders::Orders,
+    product_skus::ProductSku,
+};
 
 pub struct OrderController;
 
@@ -30,10 +37,11 @@ impl OrderController {
         Query(inner): Query<HashMap<String, serde_json::Value>>,
     ) -> impl IntoResponse {
         let mut pagination = Pagination::new(vec![], page_per);
-        match Orders::index(user.id, inner, &mut pagination).await {
-            Ok(()) => ApiResponse::response(Some(pagination)).json(),
-            Err(e) => ApiResponse::fail_msg(e.to_string()).json(),
+        if let Err(e) = Orders::index(user.id, inner, &mut pagination).await {
+            return ApiResponse::fail_msg(e.to_string()).json();
         }
+
+        ApiResponse::response(Some(pagination)).json()
     }
 
     // 订单详情
@@ -292,10 +300,77 @@ impl OrderController {
         let mut pagination: Pagination<HashMap<String, serde_json::Value>> =
             Pagination::new(vec![], page_per);
 
-        match OrderItems::evaluate_list(product_id, &mut pagination).await {
-            Ok(()) => ApiResponse::response(Some(pagination)).json(),
-            Err(e) => ApiResponse::fail_msg(e.to_string()).json(),
+        if let Err(e) = OrderItems::evaluate_list(product_id, &mut pagination).await {
+            return ApiResponse::fail_msg(e.to_string()).json();
         }
+
+        ApiResponse::response(Some(pagination)).json()
+    }
+
+    pub async fn pay_by_installments(
+        Extension(user): Extension<Claims>,
+        Json(payload): Json<ReqInstallments>,
+    ) -> impl IntoResponse {
+        let cfg = common::application_config().await;
+        if payload.min_amount < cfg.min_installment_amount {
+            return ApiResponse::fail_msg(format!(
+                "最低可分期金额: {}",
+                cfg.min_installment_amount
+            ))
+            .json();
+        }
+
+        if cfg.installment_fee_rate.contains_key(&payload.count) {
+            return ApiResponse::fail_msg("分期参数不合法".to_string()).json();
+        }
+
+        let order = match Orders::get(payload.order_id, user.id).await {
+            Err(_e) => {
+                return ApiResponse::fail_msg("分期失败".to_string()).json();
+            }
+            Ok(value) => value,
+        };
+
+        if order.closed {
+            return ApiResponse::fail_msg("订单已关闭".to_string()).json();
+        }
+
+        let _ = Installments::delete(order.id, Status::PENDING).await;
+
+        let result = Installments::create(
+            order.id as u64,
+            user.id as u64,
+            payload.count,
+            order.total_amount,
+        )
+        .await;
+        match result {
+            Err(_e) => return ApiResponse::fail_msg("创建订单失败".to_string()).json(),
+            Ok(id) => ApiResponse::response(Some(json!({
+                "id": id,
+            })))
+            .json(),
+        }
+    }
+
+    pub async fn installment_index(
+        Query(page_per): Query<PagePer>,
+        Extension(user): Extension<Claims>,
+    ) -> impl IntoResponse {
+        let mut pagination = Pagination::new(vec![], page_per);
+
+        if let Err(e) = Installments::index(user.id, &mut pagination).await {
+            return ApiResponse::fail_msg(e.to_string()).json();
+        }
+
+        return ApiResponse::response(Some(pagination)).json();
+    }
+
+    pub async fn installment_detail(
+        Query(installment_id): Query<i64>,
+        Extension(user): Extension<Claims>,
+    ) -> impl IntoResponse {
+        todo!()
     }
 }
 

@@ -3,6 +3,8 @@ use std::sync::Arc;
 
 use async_once::AsyncOnce;
 use lazy_static::lazy_static;
+use rand::distributions::DistString;
+use rand::Rng;
 use regex::Regex;
 use serde::de::DeserializeOwned;
 use serde_json::Value;
@@ -156,4 +158,16 @@ fn fibonacci(n: u32) -> u32 {
     }
 
     fibonacci(n - 1) + fibonacci(n - 2)
+}
+
+pub fn get_random_str(len: usize) -> String {
+    use rand::{distributions::Alphanumeric, thread_rng};
+
+    let mut rng = thread_rng();
+    let mut value = rng
+        .sample_iter(Alphanumeric)
+        .take(len)
+        .map(char::from)
+        .collect::<String>();
+    value.to_uppercase()
 }

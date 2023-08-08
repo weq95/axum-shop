@@ -5,6 +5,8 @@ pub mod categories;
 pub mod coupons;
 pub mod crowdfunding;
 pub mod favorite_products;
+pub mod installment_items;
+pub mod installments;
 pub mod order_items;
 pub mod orders;
 pub mod product_skus;
