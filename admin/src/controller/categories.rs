@@ -78,7 +78,6 @@ impl CategoriesController {
             _ => {
                 return ApiResponse::fail_msg("类目不存在".to_string()).json();
             }
-            Err(e) => return ApiResponse::fail_msg(e.to_string()).json(),
         }
     }
 

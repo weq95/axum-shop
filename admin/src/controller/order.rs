@@ -208,7 +208,9 @@ impl OrderController {
         }
     }
 
-    pub async fn delete() -> impl IntoResponse {}
+    pub async fn delete() -> impl IntoResponse {
+        todo!()
+    }
 
     // 发货
     pub async fn ship(

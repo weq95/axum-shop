@@ -1,6 +1,5 @@
 use serde::{Deserialize, Serialize};
 use sqlx::postgres::types::PgMoney;
-use sqlx::Postgres;
 
 #[derive(Debug, sqlx::FromRow)]
 pub struct CrowdfundingProduct {
