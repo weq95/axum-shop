@@ -1,7 +1,9 @@
+use chrono::NaiveDateTime;
 use std::collections::HashMap;
 
 use serde::{Deserialize, Serialize};
 use serde_json::json;
+use sqlx::postgres::types::PgMoney;
 use sqlx::types::Json;
 use sqlx::Row;
 
@@ -11,6 +13,7 @@ use common::Pagination;
 use crate::models::crowdfunding::CrowdfundingProduct;
 use crate::models::favorite_products::FavoriteProducts;
 use crate::models::product_skus::ProductSku;
+use crate::models::products::PType::Crowdfunding;
 
 #[derive(Debug, Serialize, Deserialize, Default, sqlx::FromRow)]
 pub struct Product {
@@ -43,7 +46,11 @@ impl Default for PType {
 
 impl Product {
     /// 创建
-    pub async fn create(product: Product) -> ApiResult<u64> {
+    pub async fn create(
+        product: Product,
+        target_amount: PgMoney,
+        end_at: chrono::NaiveDateTime,
+    ) -> ApiResult<u64> {
         let mut tx = common::postgres().await.begin().await?;
 
         let product_sku = product
@@ -71,6 +78,10 @@ impl Product {
         if false == ProductSku::add_product_sku(id, &product.skus, &mut tx).await? {
             tx.rollback().await?;
             return Err(ApiError::Error("添加商品sku失败, 请稍后重试".to_string()));
+        }
+
+        if product.r#type == Crowdfunding {
+            CrowdfundingProduct::store(id, target_amount, end_at, &mut tx).await?;
         }
 
         //添加sku
@@ -300,7 +311,7 @@ impl Product {
     // 获取商品信息
     pub async fn product_maps(ids: Vec<i64>) -> ApiResult<HashMap<i64, serde_json::Value>> {
         Ok(
-            sqlx::query("select id, title from products where id = any($1)")
+            sqlx::query("select id, title,sku_price from products where id = any($1)")
                 .bind(ids)
                 .fetch_all(common::postgres().await)
                 .await?
@@ -308,7 +319,8 @@ impl Product {
                 .map(|row| {
                     json!({
                         "id": row.get::<i64, _>("id"),
-                        "title": row.get::<String, _>("title")
+                        "title": row.get::<String, _>("title"),
+                        "sku_price": row.get::<f64, _>("sku_price"),
                     })
                 })
                 .map(|row| (row.get("id").unwrap().as_i64().unwrap(), row))

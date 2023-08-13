@@ -3,6 +3,8 @@ use std::sync::Arc;
 
 use async_once::AsyncOnce;
 use lazy_static::lazy_static;
+use rand::distributions::DistString;
+use rand::Rng;
 use regex::Regex;
 use serde::de::DeserializeOwned;
 use serde_json::Value;
@@ -138,4 +140,34 @@ pub fn string_trim_yh(value: &serde_json::Value) -> String {
     let binding = value.clone();
 
     binding.trim_matches('"').to_string()
+}
+
+fn bubble_sort<T: Ord>(arr: &mut [T]) {
+    for i in 0..arr.len() {
+        for j in 0..arr.len() - 1 - i {
+            if arr[i] > arr[j + 1] {
+                arr.swap(j, j + 1);
+            }
+        }
+    }
+}
+
+fn fibonacci(n: u32) -> u32 {
+    if n == 0 || n == 1 {
+        return n;
+    }
+
+    fibonacci(n - 1) + fibonacci(n - 2)
+}
+
+pub fn get_random_str(len: usize) -> String {
+    use rand::{distributions::Alphanumeric, thread_rng};
+
+    let mut rng = thread_rng();
+    let mut value = rng
+        .sample_iter(Alphanumeric)
+        .take(len)
+        .map(char::from)
+        .collect::<String>();
+    value.to_uppercase()
 }

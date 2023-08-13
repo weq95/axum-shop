@@ -47,3 +47,10 @@ pub struct OrderEvaluate {
     #[validate(length(min = 4, max = 100, message = "评价内容必须在4-255字符之间"))]
     pub content: Option<String>,
 }
+
+#[derive(Deserialize, Serialize, Clone)]
+pub struct ReqInstallments {
+    pub min_amount: f32,
+    pub count: u8,
+    pub order_id: i64,
+}

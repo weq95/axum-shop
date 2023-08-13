@@ -5,6 +5,7 @@ use axum::response::IntoResponse;
 use axum::Json;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
+use sqlx::postgres::types::PgMoney;
 use sqlx::types::Json as SqlxJson;
 use validator::Validate;
 use validator::ValidationError;
@@ -112,15 +113,19 @@ impl ProductController {
             }
         }
 
-        let result = Product::create(Product {
-            title: payload.title.clone().unwrap(),
-            description: payload.description.clone().unwrap(),
-            image: payload.image.clone().unwrap(),
-            on_sale: payload.on_sale.unwrap(),
-            skus,
-            category_id: payload.category_id.unwrap(),
-            ..Product::default()
-        })
+        let result = Product::create(
+            Product {
+                title: payload.title.clone().unwrap(),
+                description: payload.description.clone().unwrap(),
+                image: payload.image.clone().unwrap(),
+                on_sale: payload.on_sale.unwrap(),
+                skus,
+                category_id: payload.category_id.unwrap(),
+                ..Product::default()
+            },
+            PgMoney::from(payload.target_amount.unwrap()),
+            payload.end_at.unwrap(),
+        )
         .await;
         match result {
             Ok(product_id) => ApiResponse::response(Some(json!({ "id": product_id }))).json(),
@@ -229,6 +234,10 @@ pub struct ReqProduct {
     pub skus: Option<Vec<ReqProductSku>>,
     #[validate(range(min = 1, message = "请选择类目"))]
     pub category_id: Option<i64>,
+    #[validate(required(message = "请选择类型"))]
+    pub r#type: Option<u8>,
+    pub target_amount: Option<i64>,
+    pub end_at: Option<chrono::NaiveDateTime>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Validate)]

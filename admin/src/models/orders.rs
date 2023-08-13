@@ -239,17 +239,16 @@ impl Orders {
                 order_ids.push(order_id);
 
                 HashMap::from([
-                    ("id".to_string(), serde_json::to_value(order_id).unwrap()),
+                    ("id".to_string(), json!(order_id)),
                     (
                         "status".to_string(),
-                        serde_json::to_value(Self::status_name(pay_method, refund_status)).unwrap(),
+                        json!(Self::status_name(pay_method, refund_status)),
                     ),
                     (
                         "created_at".to_string(),
-                        serde_json::to_value(common::time_ymd_his(
+                        json!(common::time_ymd_his(
                             row.get::<chrono::NaiveDateTime, _>("created_at"),
-                        ))
-                        .unwrap(),
+                        )),
                     ),
                 ])
             })

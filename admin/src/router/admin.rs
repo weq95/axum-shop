@@ -121,6 +121,14 @@ pub async fn admin() -> Router {
                 get(OrderController::evaluate_list).post(OrderController::evaluate),
             )
             .route(
+                "/payment/:id/installment",
+                post(OrderController::pay_by_installments),
+            )
+            .route(
+                "/installment/index",
+                get(OrderController::installment_index),
+            )
+            .route(
                 "/:id",
                 get(OrderController::get).post(OrderController::update),
             ),

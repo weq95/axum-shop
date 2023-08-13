@@ -689,6 +689,7 @@ dependencies = [
  "lazy_static",
  "md5",
  "r2d2_redis",
+ "rand",
  "redis 0.22.3",
  "regex",
  "serde",
