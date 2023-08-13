@@ -219,7 +219,7 @@ impl OrderItems {
             let user_id = row.get::<i64, _>("user_id");
             let reviewed_at = row
                 .get::<chrono::NaiveDateTime, _>("reviewed_at")
-                .format("%Y-%m-%d %H:%M:%S")
+                .format("%F %T")
                 .to_string();
 
             user_ids.push(user_id);

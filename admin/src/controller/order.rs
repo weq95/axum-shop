@@ -73,8 +73,8 @@ impl OrderController {
             "reviewed": order.reviewed,
             "ship_status": order.ship_status.to_string(),
             "extra": order.extra,
-            "created_at": order.created_at.format("%Y-%m-%d %H:%M:%S").to_string(),
-            "updated_at": order.updated_at.format("%Y-%m-%d %H:%M:%S").to_string(),
+            "created_at": order.created_at.format("%F %T").to_string(),
+            "updated_at": order.updated_at.format("%F %T").to_string(),
             "items": order_items,
         })))
         .json()

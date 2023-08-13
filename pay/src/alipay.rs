@@ -83,7 +83,7 @@ impl<'a> AliPay<'a> {
     }
 
     pub fn get_param(&self, method: String) -> PayResult<Vec<(String, String)>> {
-        let timestamp = chrono::Local::now().format("%Y-%m-%d %H:%M:%S").to_string();
+        let timestamp = chrono::Local::now().format("%F %T").to_string();
         let mut params: Vec<(String, String)> = Vec::with_capacity(self.request.len() + 3);
 
         for (key, val) in self.request.iter() {

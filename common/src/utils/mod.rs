@@ -131,7 +131,7 @@ pub async fn rabbit_mq() -> Arc<lapin::Connection> {
 
 // 格式化年月日,时分秒
 pub fn time_ymd_his(date_time: chrono::NaiveDateTime) -> String {
-    date_time.format("%Y-%m-%d %H:%M:%S").to_string()
+    date_time.format("%F %T").to_string()
 }
 
 // 字符串除去双引号
