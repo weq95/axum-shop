@@ -8,6 +8,7 @@ use tracing::info;
 use crate::controller::MQMANAGER;
 
 mod controller;
+mod jobs;
 mod middleware;
 mod models;
 mod router;
@@ -32,6 +33,12 @@ async fn main() {
     MQMANAGER.get().await;
 
     info!("admin-srv run at: {}", addr);
+    tokio::spawn(async {
+        if let Err(e) = jobs::calculate_installment_fine().await {
+            println!("calculate_fine: {}", e);
+        }
+        jobs::start_jobs();
+    });
     axum::Server::bind(&addr)
         .serve(router.into_make_service())
         .await
