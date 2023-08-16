@@ -28,35 +28,36 @@ pub async fn calculate_installment_fine() -> ApiResult<()> {
             "select id,installment_id,base,fee,fine,due_date from installment_items where id > $1\
            and due_date <= now() and paid_at is null order by id ASC limit 100",
         )
-            .bind(id)
-            .fetch_all(&*common::postgres().await)
-            .await?
-            .iter()
-            .map(|row| {
-                let item_id = row.get::<i64, _>("id");
-                let installment_id = row.get::<i64, _>("installment_id");
-                ids.push(installment_id);
-                id = item_id;
-                CalculateFineItems {
-                    installment_id,
-                    id: item_id,
-                    base: row.get::<PgMoney, _>("base"),
-                    fee: row.get::<PgMoney, _>("fee"),
-                    fine: row.get::<PgMoney, _>("fine"),
-                    due_time: row.get::<chrono::DateTime<Local>, _>("due_date"),
-                }
-            })
-            .collect::<Vec<CalculateFineItems>>();
+        .bind(id)
+        .fetch_all(&*common::postgres().await)
+        .await?
+        .iter()
+        .map(|row| {
+            let item_id = row.get::<i64, _>("id");
+            let installment_id = row.get::<i64, _>("installment_id");
+            ids.push(installment_id);
+            id = item_id;
+            CalculateFineItems {
+                installment_id,
+                id: item_id,
+                base: row.get::<PgMoney, _>("base"),
+                fee: row.get::<PgMoney, _>("fee"),
+                fine: row.get::<PgMoney, _>("fine"),
+                due_time: row.get::<chrono::DateTime<Local>, _>("due_date"),
+            }
+        })
+        .collect::<Vec<CalculateFineItems>>();
 
-        if items.is_empty() { break; }
+        if items.is_empty() {
+            break;
+        }
         let installments = Installments::overdue_items(ids).await?;
 
         for item in items {
             let days = Local::now().signed_duration_since(item.due_time).num_days();
             let base = item.base.add(item.fee);
-            let fine = PgMoney::from(
-                base.0 * days *
-                    installments.get(&item.installment_id).unwrap().0);
+            let fine =
+                PgMoney::from(base.0 * days * installments.get(&item.installment_id).unwrap().0);
             let fine = if fine.0 > base.0 { base } else { fine };
 
             sqlx::query("update installment_items set fine = $1 where id = $2")

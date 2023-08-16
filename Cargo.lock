@@ -27,6 +27,7 @@ dependencies = [
  "casbin",
  "chrono",
  "common",
+ "cron-job",
  "futures",
  "http",
  "http-body",
@@ -794,6 +795,27 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b540bd8bc810d3885c6ea91e2018302f68baba2129ab3e88f32389ee9370880d"
 dependencies = [
  "cfg-if",
+]
+
+[[package]]
+name = "cron"
+version = "0.12.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1ff76b51e4c068c52bfd2866e1567bee7c567ae8f24ada09fd4307019e25eab7"
+dependencies = [
+ "chrono",
+ "nom 7.1.1",
+ "once_cell",
+]
+
+[[package]]
+name = "cron-job"
+version = "0.1.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3b9eff9666ab251e4ee3cf5d0d56def0a4e603852cbd4aae54cc2374395b058c"
+dependencies = [
+ "chrono",
+ "cron",
 ]
 
 [[package]]

@@ -7,12 +7,13 @@ use serde_json::json;
 use sqlx::postgres::types::PgMoney;
 use sqlx::Row;
 
-use common::{Pagination, utils};
 use common::error::{ApiError, ApiResult};
+use common::{utils, Pagination};
 
-use crate::models::installment_items::{InstallmentItems, PayMethod, RefundStatus};
+use crate::models::installment_items::InstallmentItems;
 use crate::models::orders::Orders;
 use crate::models::user::Admin;
+use crate::models::{PayMethod, RefundStatus};
 
 #[derive(Debug, sqlx::FromRow)]
 pub struct Installments {
@@ -59,10 +60,10 @@ impl Installments {
             let exists = sqlx::query(
                 "SELECT exists(SELECT id FROM installments WHERE no = $1 AND deleted_at IS NULL)",
             )
-                .bind(&no)
-                .fetch_one(&*common::postgres().await)
-                .await?
-                .get::<bool, _>("exists");
+            .bind(&no)
+            .fetch_one(&*common::postgres().await)
+            .await?
+            .get::<bool, _>("exists");
             if !exists {
                 break;
             }
@@ -301,13 +302,23 @@ impl Installments {
             .bind(Status::REPAYING)
             .bind(ids)
             .fetch_all(&*common::postgres().await)
-            .await?.iter().map(|row| {
-            let key = row.get::<i64, _>("id");
-            let val = row.get::<PgMoney, _>("fine_rate");
-            result.insert(key, val);
-            ()
-        }).collect::<Vec<()>>();
+            .await?
+            .iter()
+            .map(|row| {
+                let key = row.get::<i64, _>("id");
+                let val = row.get::<PgMoney, _>("fine_rate");
+                result.insert(key, val);
+                ()
+            })
+            .collect::<Vec<()>>();
 
         Ok(result)
+    }
+
+    pub async fn refund(order: &Orders) {
+        if order.pay_method != PayMethod::Installment {
+            return;
+        }
+        todo!()
     }
 }
