@@ -3828,6 +3828,7 @@ dependencies = [
  "fast_log",
  "jsonwebtoken",
  "log",
+ "pay",
  "percent-encoding",
  "redis 0.22.3",
  "serde",

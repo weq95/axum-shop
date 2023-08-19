@@ -2,6 +2,7 @@ use std::collections::HashMap;
 use std::error::Error;
 use std::io::Error as IoError;
 
+pub use alipay::AliPay;
 use openssl::error::ErrorStack;
 use openssl::{
     base64,
@@ -16,6 +17,7 @@ mod cert;
 
 pub type PayResult<T> = Result<T, PayError>;
 
+#[derive(Debug)]
 pub enum PayError {
     Err(String),
     ErrArr(Vec<String>),

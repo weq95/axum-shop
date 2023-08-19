@@ -1,11 +1,15 @@
 use std::collections::HashMap;
 
+use serde_json::json;
+
+use crate::cert::CertX509;
 use crate::{PayResult, Sign};
 
 pub struct AliPay<'a> {
     public_key: &'a str,
     private_key: &'a str,
-    request: HashMap<&'a str, &'a str>,
+    request: HashMap<&'a str, String>,
+    biz_content: HashMap<&'a str, String>,
     sandbox: bool,
 }
 
@@ -26,6 +30,7 @@ impl<'a> AliPay<'a> {
             private_key,
             sandbox: true,
             request: HashMap::new(),
+            biz_content: HashMap::new(),
         }
     }
 
@@ -37,22 +42,23 @@ impl<'a> AliPay<'a> {
 
     pub fn url(&self) -> &str {
         if self.sandbox {
-            return "https://openapi.alipaydev.com/gateway.do";
+            return "https://openapi-sandbox.dl.alipaydev.com/gateway.do";
         }
 
         "https://openapi.alipay.com/gateway.do"
     }
+
     pub fn request<'b: 'a>(&'a mut self, app_id: &'b str) -> &'a mut Self {
-        let param = vec![
+        let default = vec![
             ("app_id", app_id),
             ("charset", "utf-8"),
             ("sign_type", "RSA2"),
-            ("format", "jFson"),
+            ("format", "json"),
             ("version", "1.0"),
         ];
 
-        for (key, val) in param {
-            self.request.insert(key, val);
+        for (key, val) in default {
+            self.request.insert(key, val.to_string());
         }
 
         self
@@ -60,7 +66,7 @@ impl<'a> AliPay<'a> {
 
     pub fn add_request<'b: 'a>(&'a mut self, param: Vec<(&'b str, &'b str)>) -> &'a mut Self {
         for (key, val) in param {
-            self.request.insert(key, val);
+            self.request.insert(key, val.to_string());
         }
 
         self
@@ -71,24 +77,48 @@ impl<'a> AliPay<'a> {
         cert: Option<&'b str>,
         root_cert: Option<&'b str>,
     ) -> &'a mut Self {
+        let cert_x509 = CertX509::new();
         if let Some(cert) = cert {
-            self.request.insert("cert_sn", cert);
+            match cert_x509.cert_sn(cert) {
+                Ok(vale) => {
+                    self.request.insert("cert_sn", vale);
+                }
+                Err(e) => println!("cert: {:?}, content: {}", e, cert),
+            }
         }
 
         if let Some(root_cert) = root_cert {
-            self.request.insert("root_cert_sn", root_cert);
+            match cert_x509.root_cert_sn(root_cert) {
+                Ok(vale) => {
+                    self.request.insert("root_cert_sn", vale);
+                }
+                Err(e) => println!("root_cert: {:?}, content:{}", e, root_cert),
+            }
         }
 
         self
     }
 
-    pub fn get_param(&self, method: String) -> PayResult<Vec<(String, String)>> {
+    pub fn to_json(
+        &self,
+        method: String,
+        biz_content: Option<&Vec<(&str, &str)>>,
+    ) -> PayResult<serde_json::Value> {
         let timestamp = chrono::Local::now().format("%F %T").to_string();
         let mut params: Vec<(String, String)> = Vec::with_capacity(self.request.len() + 3);
 
         for (key, val) in self.request.iter() {
             params.push((key.to_string(), val.to_string()));
         }
+
+        let mut biz_content_param = json!({});
+        if let Some(biz_content) = biz_content {
+            for (key, val) in biz_content.iter() {
+                biz_content_param[key] = json!(val);
+            }
+        }
+
+        params.push(("biz_content".to_string(), biz_content_param.to_string()));
         params.push(("timestamp".to_string(), timestamp));
         params.push(("method".to_string(), method));
         params.sort_by(|a, b| a.0.cmp(&b.0));
@@ -100,31 +130,32 @@ impl<'a> AliPay<'a> {
 
         params.push(("sign".to_string(), self.sign(&tmp)?));
 
-        Ok(params)
-    }
-
-    fn param_to_string(&self, method: String) -> PayResult<String> {
-        let mut content = String::new();
-
-        for (key, val) in self.get_param(method)?.iter() {
-            content.push_str(&format!("{key}={val}&"));
+        let mut json_body = json!({});
+        for (key, val) in params.iter() {
+            json_body[key.as_str()] = json!(val.as_str());
         }
-        content.pop();
 
-        Ok(content)
+        Ok(json_body)
     }
-    async fn post<S>(
+
+    pub async fn post<S>(
         &mut self,
         method: S,
-        biz_content: Option<String>,
+        biz_content: Option<&Vec<(&str, &str)>>,
     ) -> PayResult<reqwest::Response>
     where
         S: Into<String>,
     {
-        let body = reqwest::Body::from(self.param_to_string(method.into())?);
-        Ok(reqwest::ClientBuilder::new()
-            .build()?
+        let request = self.to_json(method.into(), biz_content)?;
+
+        println!("{:#?}", request);
+        Ok(reqwest::Client::new()
             .post(self.url())
+            .header(
+                "Content-Type",
+                "application/x-www-form-urlencoded;charset=utf-8",
+            )
+            .query(&request)
             .send()
             .await?)
     }

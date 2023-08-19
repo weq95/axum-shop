@@ -1,11 +1,10 @@
-use std::fs;
-
-use crate::PayResult;
 use openssl::{
     hash::{hash, MessageDigest},
     nid::Nid,
     x509::{X509NameEntries, X509},
 };
+
+use crate::PayResult;
 
 pub struct CertX509;
 
@@ -14,8 +13,8 @@ impl CertX509 {
         CertX509
     }
 
-    pub(crate) fn cert_sn(&self, cert_path: &str) -> PayResult<String> {
-        let ssl = X509::from_pem(fs::read_to_string(cert_path)?.as_bytes())?;
+    pub fn cert_sn(&self, cert_content: &str) -> PayResult<String> {
+        let ssl = X509::from_pem(cert_content.as_bytes())?;
         let issuer = self.to_string(ssl.issuer_name().entries())?;
         let serial_number = ssl.serial_number().to_bn()?.to_dec_str()?;
         let result = issuer + &serial_number;
@@ -23,8 +22,8 @@ impl CertX509 {
         Ok(hex::encode(hash(MessageDigest::md5(), result.as_ref())?))
     }
 
-    pub(crate) fn root_cert_sn(&self, root_cert_path: &str) -> PayResult<String> {
-        Ok(fs::read_to_string(root_cert_path.to_string())?
+    pub fn root_cert_sn(&self, root_cert_content: &str) -> PayResult<String> {
+        Ok(root_cert_content
             .split_inclusive("-----END CERTIFICATE-----")
             .filter(|cert| {
                 let ssl = X509::from_pem(cert.as_ref()).unwrap();
@@ -32,7 +31,8 @@ impl CertX509 {
 
                 algorithm == Nid::SHA256WITHRSAENCRYPTION || algorithm == Nid::SHA1WITHRSAENCRYPTION
             })
-            .collect::<Vec<&str>>()
+            .filter_map(|cert| self.cert_sn(cert.as_ref()).ok())
+            .collect::<Vec<String>>()
             .join("_"))
     }
 
