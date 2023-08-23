@@ -7,12 +7,12 @@ use serde_json::json;
 use sqlx::postgres::types::PgMoney;
 use sqlx::Row;
 
-use common::error::{ApiError, ApiResult};
-use common::{utils, Pagination};
-
-use crate::models::installment_items::{InstallmentItems, PayMethod, RefundStatus};
+use crate::models::installment_items::InstallmentItems;
 use crate::models::orders::Orders;
 use crate::models::user::Admin;
+use crate::models::{PayMethod, RefundStatus};
+use common::error::{ApiError, ApiResult};
+use common::{utils, Pagination};
 
 #[derive(Debug, sqlx::FromRow)]
 pub struct Installments {
@@ -293,5 +293,30 @@ impl Installments {
         }
 
         Ok((detail, list))
+    }
+    pub async fn overdue_items(ids: Vec<i64>) -> ApiResult<HashMap<i64, PgMoney>> {
+        let mut result = HashMap::with_capacity(ids.len());
+        let _ = sqlx::query("select id, fine_rate from installments where status=$1 and any($2)")
+            .bind(Status::REPAYING)
+            .bind(ids)
+            .fetch_all(&*common::postgres().await)
+            .await?
+            .iter()
+            .map(|row| {
+                let key = row.get::<i64, _>("id");
+                let val = row.get::<PgMoney, _>("fine_rate");
+                result.insert(key, val);
+                ()
+            })
+            .collect::<Vec<()>>();
+
+        Ok(result)
+    }
+
+    pub async fn refund(order: &Orders) {
+        if order.pay_method != PayMethod::Installment {
+            return;
+        }
+        todo!()
     }
 }

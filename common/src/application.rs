@@ -52,6 +52,7 @@ pub struct Application {
     pub installment_fee_rate: HashMap<u8, f32>,
     pub min_installment_amount: f32,
     pub installment_fine_rate: f32,
+    pub alipay: AlipayConfig,
 }
 
 #[async_trait]
@@ -94,6 +95,7 @@ impl Application {
             installment_fee_rate: Self::analysis::<HashMap<u8, f32>>("installment_fee_rate", &cfg)?,
             min_installment_amount: Self::analysis::<f32>("min_installment_amount", &cfg)?,
             installment_fine_rate: Self::analysis::<f32>("installment_fine_rate", &cfg)?,
+            alipay: Self::analysis::<AlipayConfig>("alipay", &cfg)?,
         })
     }
 
@@ -171,6 +173,14 @@ pub struct RabbitMQConfig {
     pub password: String,
     pub port: u16,
     pub vhost: String,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct AlipayConfig {
+    pub app_id: String,
+    pub private_key: String,
+    pub return_url: String,
+    pub notify_url: String,
 }
 
 #[cfg(test)]

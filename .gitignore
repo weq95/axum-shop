@@ -1,6 +1,7 @@
 /target
 .vscode
 .idea
+.fleet
 /application.yaml
 /files
 /cert

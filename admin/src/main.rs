@@ -8,6 +8,7 @@ use tracing::info;
 use crate::controller::MQMANAGER;
 
 mod controller;
+mod jobs;
 mod middleware;
 mod models;
 mod router;

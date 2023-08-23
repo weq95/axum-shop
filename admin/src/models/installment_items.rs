@@ -9,6 +9,7 @@ use sqlx::Row;
 use common::error::{ApiError, ApiResult};
 
 use crate::models::installments::{Installments, Status};
+use crate::models::{PayMethod, RefundStatus};
 
 #[derive(Debug, sqlx::FromRow)]
 pub struct InstallmentItems {
@@ -24,48 +25,6 @@ pub struct InstallmentItems {
     pub refund_status: RefundStatus,
     pub crated_at: chrono::NaiveDateTime,
     pub updated_at: chrono::NaiveDateTime,
-}
-
-#[repr(i8)]
-#[derive(Debug, sqlx::Type, Serialize)]
-pub enum RefundStatus {
-    PENDING,
-    PROCESSING,
-    SUCCESS,
-    FAILED,
-}
-
-impl AsRef<str> for RefundStatus {
-    fn as_ref(&self) -> &str {
-        match self {
-            RefundStatus::PENDING => "未退款",
-            RefundStatus::PROCESSING => "退款中",
-            RefundStatus::SUCCESS => "退款成功",
-            RefundStatus::FAILED => "退款失败",
-        }
-    }
-}
-
-#[repr(i8)]
-#[derive(Debug, sqlx::Type, Serialize)]
-pub enum PayMethod {
-    Unknown,
-    AliPay,
-    WeChat,
-    GooglePay,
-    PayPal,
-}
-
-impl AsRef<str> for PayMethod {
-    fn as_ref(&self) -> &str {
-        match self {
-            PayMethod::Unknown => "其他方式",
-            PayMethod::AliPay => "支付宝",
-            PayMethod::WeChat => "微信支付",
-            PayMethod::GooglePay => "Google",
-            PayMethod::PayPal => "Paypal",
-        }
-    }
 }
 
 impl InstallmentItems {

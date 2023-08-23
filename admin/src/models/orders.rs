@@ -9,6 +9,7 @@ use common::Pagination;
 use crate::models::coupons::Coupons;
 use crate::models::order_items::{ItemProductSku, OrderItems};
 use crate::models::product_skus::ProductSku;
+use crate::models::{LogisticStatus, PayMethod, RefundStatus};
 
 #[derive(Debug, sqlx::FromRow)]
 pub struct Orders {
@@ -25,126 +26,12 @@ pub struct Orders {
     pub refund_no: Option<String>,
     pub closed: bool,
     pub reviewed: bool,
-    pub ship_status: ShipStatus,
+    pub ship_status: LogisticStatus,
     pub ship_data: sqlx::types::Json<Vec<HashMap<String, serde_json::Value>>>,
     pub extra: String,
     pub created_at: chrono::NaiveDateTime,
     pub updated_at: chrono::NaiveDateTime,
     pub coupon_id: i64,
-}
-
-/// 支付方式
-#[derive(Debug, PartialEq, sqlx::Type)]
-#[repr(i16)]
-pub enum PayMethod {
-    // 未支付
-    Unknown = 0,
-    // 支付宝
-    AliPay = 1,
-    // 微信支付
-    Wechat = 2,
-    // Google支付
-    GooglePay = 3,
-    // PayPal
-    PayPal = 4,
-}
-
-/// 退款状态
-#[derive(Debug, PartialEq, sqlx::Type)]
-#[repr(i16)]
-pub enum RefundStatus {
-    // 否(未退款)
-    No = 0,
-    // 已申请
-    AlreadyApplied = 1,
-    // 等待中
-    Waiting = 2,
-    // 是(退款成功)
-    Yes = 3,
-    // 退款失败
-    Fail = 4,
-}
-
-/// 物理状态
-#[derive(Debug, PartialEq, sqlx::Type)]
-#[repr(i16)]
-pub enum ShipStatus {
-    // 处理中
-    Processing = 0,
-    // 待收货
-    ToBeReceived = 1,
-    // 已收货
-    Received = 2,
-}
-
-impl ToString for PayMethod {
-    fn to_string(&self) -> String {
-        match self {
-            PayMethod::Unknown => "未支付".to_string(),
-            PayMethod::AliPay => "支付宝".to_string(),
-            PayMethod::Wechat => "微信支付".to_string(),
-            PayMethod::GooglePay => "Google支付".to_string(),
-            PayMethod::PayPal => "PayPal支付".to_string(),
-        }
-    }
-}
-
-impl ToString for RefundStatus {
-    fn to_string(&self) -> String {
-        match self {
-            RefundStatus::No => "未退货".to_string(),
-            RefundStatus::AlreadyApplied => "已申请退款".to_string(),
-            RefundStatus::Waiting => "退款中".to_string(),
-            RefundStatus::Yes => "退款成功".to_string(),
-            RefundStatus::Fail => "退款失败".to_string(),
-        }
-    }
-}
-
-impl ToString for ShipStatus {
-    fn to_string(&self) -> String {
-        match self {
-            ShipStatus::Processing => "处理中".to_string(),
-            ShipStatus::ToBeReceived => "待收货".to_string(),
-            ShipStatus::Received => "已收货".to_string(),
-        }
-    }
-}
-
-impl Default for PayMethod {
-    fn default() -> Self {
-        PayMethod::AliPay
-    }
-}
-
-impl Into<i16> for PayMethod {
-    fn into(self) -> i16 {
-        self as i16
-    }
-}
-
-impl Default for RefundStatus {
-    fn default() -> Self {
-        RefundStatus::No
-    }
-}
-
-impl Into<i16> for RefundStatus {
-    fn into(self) -> i16 {
-        self as i16
-    }
-}
-
-impl Default for ShipStatus {
-    fn default() -> Self {
-        ShipStatus::Processing
-    }
-}
-
-impl Into<i16> for ShipStatus {
-    fn into(self) -> i16 {
-        self as i16
-    }
 }
 
 impl Orders {
@@ -173,7 +60,7 @@ impl Orders {
             .bind(json!(address))
             .bind(total_money)
             .bind(remark)
-            .bind::<i16>(ShipStatus::Processing.into())
+            .bind::<i8>(LogisticStatus::Processing.into())
             .bind(json!(ship_data))
             .fetch_one(&mut tx)
             .await?.get::<i64, _>("id");
@@ -301,29 +188,24 @@ impl Orders {
     // 订单状态
     fn status_name(pay_method: PayMethod, refund_status: RefundStatus) -> String {
         match refund_status {
-            RefundStatus::No => match pay_method {
-                PayMethod::Unknown => "未支付".to_string(),
-                PayMethod::AliPay => "支付宝".to_string(),
-                PayMethod::Wechat => "微信支付".to_string(),
-                PayMethod::GooglePay => "Google支付".to_string(),
-                PayMethod::PayPal => "PayPal".to_string(),
-            },
-            RefundStatus::Fail => "退款失败".to_string(),
-            RefundStatus::Yes => "退款成功".to_string(),
+            RefundStatus::PENDING => pay_method.as_ref().to_string(),
+            RefundStatus::FAILED => "退款失败".to_string(),
+            RefundStatus::SUCCESS => "退款成功".to_string(),
             RefundStatus::Waiting => "退款中".to_string(),
-            RefundStatus::AlreadyApplied => "已申请退款，等待审核".to_string(),
+            RefundStatus::PROCESSING => "已申请退款，等待审核".to_string(),
         }
     }
 
     // 发货
     pub async fn ship(userid: i64, id: i64, no: String, company: String) -> ApiResult<bool> {
         let order = Orders::get(id, userid).await?;
-        if order.ship_status != ShipStatus::Processing || order.pay_method == PayMethod::Unknown {
+        if order.ship_status != LogisticStatus::Processing || order.pay_method == PayMethod::Unknown
+        {
             return Ok(false);
         }
 
         Ok(sqlx::query("update orders set ship_status = $1,ship_data=$2, updated_at = $3 where id = $4 and user_id = $5")
-            .bind::<i16>(ShipStatus::ToBeReceived.into())
+            .bind::<i8>(LogisticStatus::ToBeReceived.into())
             .bind(json!(vec![
             HashMap::from([
             ("express_no", no),
@@ -339,14 +221,14 @@ impl Orders {
     // 确认收获
     pub async fn received(id: i64, userid: i64) -> ApiResult<bool> {
         let order = Orders::get(id, userid).await?;
-        if order.ship_status != ShipStatus::ToBeReceived {
+        if order.ship_status != LogisticStatus::ToBeReceived {
             return Ok(false);
         }
 
         Ok(sqlx::query(
             "update orders set ship_status = $1, updated_at = $2 where id = $3 and user_id = $4",
         )
-        .bind::<i16>(ShipStatus::Received.into())
+        .bind::<i8>(LogisticStatus::Received.into())
         .bind(chrono::Local::now())
         .bind(id)
         .bind(userid)
