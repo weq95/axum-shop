@@ -11,15 +11,6 @@ async fn main() {
         .serve(router().into_make_service())
         .await
         .unwrap();
-    /* match response {
-        Ok(value) => {
-            println!("{value:#?}");
-            println!("{:?}", value.bytes().await)
-        }
-        Err(_e) => {
-            println!("{:?}", _e)
-        }
-    }*/
 }
 
 fn router() -> axum::Router {
@@ -27,20 +18,20 @@ fn router() -> axum::Router {
 }
 
 async fn alipay_web() -> impl IntoResponse {
-    let cfg = common::application_config().await;
+    let alipay = &common::application_config().await.alipay;
     let response = pay::AliPay::new(
         include_str!("../../cert/appPublicCert.crt"),
-        cfg.alipay.app_private_key.clone().as_str(),
+        alipay.private_key.clone().as_str(),
     )
-    .request(cfg.alipay.app_id.clone().as_str())
+    .request(alipay.app_id.as_str())
     .add_cert(
         Some(include_str!("../../cert/alipayPublicCert.crt")),
         Some(include_str!("../../cert/alipayRootCert.crt")),
     )
     .sandbox()
     .add_request(vec![
-        ("return_url", cfg.alipay.return_url.clone().as_str()),
-        ("notify_url", cfg.alipay.notify_url.clone().as_str()),
+        ("return_url", alipay.return_url.as_str()),
+        ("notify_url", alipay.notify_url.as_str()),
     ])
     .post(
         "alipay.trade.page.pay",
