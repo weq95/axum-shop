@@ -38,11 +38,11 @@ impl ProductProperty {
             sqlx::query(
                 "INSERT INTO product_properties (product_id, name, value) VALUES ($1, $2, $3)",
             )
-                .bind(product_id)
-                .bind(&row.0)
-                .bind(&row.1)
-                .execute(&mut *tx)
-                .await?;
+            .bind(product_id)
+            .bind(&row.0)
+            .bind(&row.1)
+            .execute(&mut *tx)
+            .await?;
         }
 
         Ok(())
@@ -73,12 +73,15 @@ impl ProductProperty {
             })
             .collect::<Vec<()>>();
 
-        let result = result.into_iter().map(|(key, val)| {
-            HashMap::from([
-                ("key".to_string(), json!(key)),
-                ("value".to_string(), json!(val)),
-            ])
-        }).collect::<Vec<HashMap<String, serde_json::Value>>>();
+        let result = result
+            .into_iter()
+            .map(|(key, val)| {
+                HashMap::from([
+                    ("key".to_string(), json!(key)),
+                    ("value".to_string(), json!(val)),
+                ])
+            })
+            .collect::<Vec<HashMap<String, serde_json::Value>>>();
 
         Ok(result)
     }
