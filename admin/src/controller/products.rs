@@ -58,6 +58,7 @@ impl ProductController {
             Ok(result) => ApiResponse::response(Some(json!({
                 "id": result.id,
                 "name": result.title,
+                "long_title": result.long_title,
                 "description": result.description,
                 "image":result.image,
                 "on_sale": result.on_sale,
@@ -132,6 +133,7 @@ impl ProductController {
         let result = Product::create(
             Product {
                 title: payload.title.clone().unwrap(),
+                long_title: payload.long_title.clone().unwrap(),
                 description: payload.description.clone().unwrap(),
                 image: payload.image.clone().unwrap(),
                 on_sale: payload.on_sale.unwrap(),
@@ -176,6 +178,7 @@ impl ProductController {
         let result = Product::update(Product {
             id: payload.id.unwrap() as i64,
             title: payload.title.clone().unwrap(),
+            long_title: payload.long_title.clone().unwrap(),
             description: payload.description.clone().unwrap(),
             image: payload.image.clone().unwrap(),
             on_sale: payload.on_sale.unwrap(),
@@ -241,6 +244,8 @@ pub struct ReqProduct {
     pub id: Option<u64>,
     #[validate(length(min = 3, max = 100), custom = "unique_title")]
     pub title: Option<String>,
+    #[validate(length(min = 3, max = 255))]
+    pub long_title: Option<String>,
     #[validate(required)]
     pub image: Option<SqlxJson<Vec<String>>>,
     #[validate(required)]

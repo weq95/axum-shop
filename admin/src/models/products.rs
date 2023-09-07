@@ -19,6 +19,7 @@ use crate::models::products::PType::Crowdfunding;
 pub struct Product {
     pub id: i64,
     pub title: String,
+    pub long_title: String,
     pub description: String,
     pub image: Json<Vec<String>>,
     pub on_sale: bool,
@@ -61,18 +62,19 @@ impl Product {
             .unwrap();
 
         let id = sqlx::query(
-            "insert into products (title,description,image,on_sale,sku_price,category_id) \
+            "insert into products (title,description,image,on_sale,sku_price,category_id,long_title) \
             values ($1, $2, $3, $4, $5, $6) RETURNING id",
         )
-        .bind(&product.title.clone())
-        .bind(&product.description.clone())
-        .bind(product.image.clone())
-        .bind(&product.on_sale.clone())
-        .bind(product_sku.price)
-        .bind(product.category_id)
-        .fetch_one(&mut tx)
-        .await?
-        .get::<i64, _>("id");
+            .bind(&product.title.clone())
+            .bind(&product.description.clone())
+            .bind(product.image.clone())
+            .bind(&product.on_sale.clone())
+            .bind(product_sku.price)
+            .bind(product.category_id)
+            .bind(product.long_title.clone())
+            .fetch_one(&mut tx)
+            .await?
+            .get::<i64, _>("id");
 
         ProductSku::delete_product_sku(id, &mut tx).await?;
 
@@ -106,6 +108,7 @@ impl Product {
                 .map(|row| Product {
                     id: row.get::<i64, _>("id"),
                     title: row.get("title"),
+                    long_title: row.get("long_title"),
                     description: row.get("description"),
                     image: row.get::<Json<Vec<String>>, _>("image"),
                     on_sale: row.get::<bool, _>("on_sale"),
@@ -170,6 +173,7 @@ impl Product {
             .map(|row| Product {
                 id: row.get::<i64, _>("id"),
                 title: row.get("title"),
+                long_title: row.get("long_title"),
                 description: row.get("description"),
                 image: row.get::<Json<Vec<String>>, _>("image"),
                 on_sale: row.get::<bool, _>("on_sale"),
@@ -217,12 +221,13 @@ impl Product {
             .unwrap();
         let mut tx = common::postgres().await.begin().await?;
         ProductSku::delete_product_sku(product.id, &mut tx).await?;
-        let row_bool = sqlx::query("update products set title = $1, description = $2, image = $3, on_sale = $4, sku_price = $5 where id = $6")
+        let row_bool = sqlx::query("update products set title = $1, description = $2, image = $3, on_sale = $4, sku_price = $5, long_title = $6 where id = $7")
             .bind(product.title.clone())
             .bind(product.description.clone())
             .bind(product.image)
             .bind(product.on_sale)
             .bind(product_sku.price)
+            .bind(product.long_title.clone())
             .bind(product.id)
             .execute(&mut tx)
             .await?.rows_affected() == 1;
