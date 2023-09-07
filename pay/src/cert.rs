@@ -1,3 +1,4 @@
+#[cfg(not(target_os = "windows"))]
 use openssl::{
     hash::{hash, MessageDigest},
     nid::Nid,
@@ -14,15 +15,25 @@ impl CertX509 {
     }
 
     pub fn cert_sn(&self, cert_content: &str) -> PayResult<String> {
-        let ssl = X509::from_pem(cert_content.as_bytes())?;
-        let issuer = self.to_string(ssl.issuer_name().entries())?;
-        let serial_number = ssl.serial_number().to_bn()?.to_dec_str()?;
-        let result = issuer + &serial_number;
+        #[cfg(not(target_os = "windows"))]
+        {
+            let ssl = X509::from_pem(cert_content.as_bytes())?;
+            let issuer = self.to_string(ssl.issuer_name().entries())?;
+            let serial_number = ssl.serial_number().to_bn()?.to_dec_str()?;
+            let result = issuer + &serial_number;
 
-        Ok(hex::encode(hash(MessageDigest::md5(), result.as_ref())?))
+            Ok(hex::encode(hash(MessageDigest::md5(), result.as_ref())?))
+        }
+
+        #[cfg(target_os = "windows")]
+        Ok(String::new())
     }
 
     pub fn root_cert_sn(&self, root_cert_content: &str) -> PayResult<String> {
+        #[cfg(target_os = "windows")]
+        return Ok(String::new());
+
+        #[cfg(not(target_os = "windows"))]
         Ok(root_cert_content
             .split_inclusive("-----END CERTIFICATE-----")
             .filter(|cert| {
@@ -36,6 +47,7 @@ impl CertX509 {
             .join("_"))
     }
 
+    #[cfg(not(target_os = "windows"))]
     pub fn to_string(&self, entries: X509NameEntries) -> PayResult<String> {
         let mut value = String::new();
         for i in entries {

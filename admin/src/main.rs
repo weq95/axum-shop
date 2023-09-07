@@ -31,6 +31,7 @@ async fn main() {
     let router = router::routers().await.layer(Extension(app_state));
 
     MQMANAGER.get().await;
+    common::elasticsearch::client().await;
 
     info!("admin-srv run at: {}", addr);
     axum::Server::bind(&addr)

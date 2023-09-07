@@ -12,11 +12,11 @@ use validator::ValidationError;
 
 use common::{ApiResponse, PagePer, Pagination};
 
-use crate::models::cart_items::CartItems;
-use crate::models::categories::Categories;
-use crate::models::favorite_products::FavoriteProducts;
-use crate::models::product_skus::ProductSku;
-use crate::models::products::Product;
+use crate::models::product_property::ProductProperty;
+use crate::models::{
+    cart_items::CartItems, categories::Categories, favorite_products::FavoriteProducts,
+    product_skus::ProductSku, products::Product,
+};
 
 pub struct ProductController;
 
@@ -50,6 +50,10 @@ impl ProductController {
             Ok(cart_item) => cart_item,
             Err(err) => return ApiResponse::fail_msg(err.to_string()).json(),
         };
+        let property = ProductProperty::propertys(product_id).await;
+        if let Err(e) = property {
+            return ApiResponse::fail_msg(e.to_string()).json();
+        }
         match Product::get(product_id).await {
             Ok(result) => ApiResponse::response(Some(json!({
                 "id": result.id,
@@ -62,6 +66,7 @@ impl ProductController {
                 "review_count":result.review_count,
                 "price": result.price,
                 "skus": result.skus,
+                "property": property.unwrap(),
                 "cart_status": cart_item.contains(&product_id),
                 "favorite_status":favorite_product.contains(&product_id),
             })))
@@ -93,6 +98,17 @@ impl ProductController {
             })
         }
 
+        let property = payload
+            .property
+            .unwrap()
+            .iter()
+            .map(|val| ProductProperty {
+                id: 0,
+                product_id: 0,
+                name: val.name.clone().unwrap(),
+                value: val.value.clone().unwrap(),
+            })
+            .collect::<Vec<ProductProperty>>();
         match Categories::exits(payload.category_id.unwrap()).await {
             Err(e) => return ApiResponse::fail_msg(e.to_string()).json(),
             Ok(bool_val) => {
@@ -120,11 +136,12 @@ impl ProductController {
                 image: payload.image.clone().unwrap(),
                 on_sale: payload.on_sale.unwrap(),
                 skus,
+                property,
                 category_id: payload.category_id.unwrap(),
                 ..Product::default()
             },
             PgMoney::from(payload.target_amount.unwrap()),
-            payload.end_at.unwrap(),
+            payload.end_at,
         )
         .await;
         match result {
@@ -232,6 +249,8 @@ pub struct ReqProduct {
     pub on_sale: Option<bool>,
     #[validate(required)]
     pub skus: Option<Vec<ReqProductSku>>,
+    #[validate(length(min = 1, max = 100, message = "商品属性必须在1-100个之间"))]
+    pub property: Option<Vec<ReqProductProperty>>,
     #[validate(range(min = 1, message = "请选择类目"))]
     pub category_id: Option<i64>,
     #[validate(required(message = "请选择类型"))]
@@ -250,6 +269,14 @@ pub struct ReqProductSku {
     pub price: Option<f64>,
     #[validate(range(min = 1))]
     pub stock: Option<i32>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Validate)]
+pub struct ReqProductProperty {
+    #[validate(length(min = 2, max = 100))]
+    pub name: Option<String>,
+    #[validate(length(min = 2, max = 100))]
+    pub value: Option<String>,
 }
 
 /// 检测商品是否已存在

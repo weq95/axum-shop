@@ -53,6 +53,7 @@ pub struct Application {
     pub min_installment_amount: f32,
     pub installment_fine_rate: f32,
     pub alipay: AlipayConfig,
+    pub elasticsearch: ElasticsearchConfig,
 }
 
 #[async_trait]
@@ -96,6 +97,7 @@ impl Application {
             min_installment_amount: Self::analysis::<f32>("min_installment_amount", &cfg)?,
             installment_fine_rate: Self::analysis::<f32>("installment_fine_rate", &cfg)?,
             alipay: Self::analysis::<AlipayConfig>("alipay", &cfg)?,
+            elasticsearch: Self::analysis::<ElasticsearchConfig>("elasticsearch", &cfg)?,
         })
     }
 
@@ -181,6 +183,14 @@ pub struct AlipayConfig {
     pub private_key: String,
     pub return_url: String,
     pub notify_url: String,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct ElasticsearchConfig {
+    pub scheme: Option<String>,
+    pub cloud_id: String,
+    pub username: String,
+    pub password: String,
 }
 
 #[cfg(test)]

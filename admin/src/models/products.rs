@@ -1,4 +1,3 @@
-use chrono::NaiveDateTime;
 use std::collections::HashMap;
 
 use serde::{Deserialize, Serialize};
@@ -12,6 +11,7 @@ use common::Pagination;
 
 use crate::models::crowdfunding::CrowdfundingProduct;
 use crate::models::favorite_products::FavoriteProducts;
+use crate::models::product_property::ProductProperty;
 use crate::models::product_skus::ProductSku;
 use crate::models::products::PType::Crowdfunding;
 
@@ -27,6 +27,7 @@ pub struct Product {
     pub review_count: i32,
     pub price: f64,
     pub skus: Vec<ProductSku>,
+    pub property: Vec<ProductProperty>,
     pub category_id: i64,
     pub r#type: PType,
 }
@@ -49,7 +50,7 @@ impl Product {
     pub async fn create(
         product: Product,
         target_amount: PgMoney,
-        end_at: chrono::NaiveDateTime,
+        end_at: Option<chrono::NaiveDateTime>,
     ) -> ApiResult<u64> {
         let mut tx = common::postgres().await.begin().await?;
 
@@ -81,9 +82,15 @@ impl Product {
         }
 
         if product.r#type == Crowdfunding {
-            CrowdfundingProduct::store(id, target_amount, end_at, &mut tx).await?;
+            CrowdfundingProduct::store(id, target_amount, end_at.unwrap(), &mut tx).await?;
         }
 
+        let property = product
+            .property
+            .iter()
+            .map(|i| (i.name.as_str(), i.value.as_str()))
+            .collect::<Vec<(&str, &str)>>();
+        ProductProperty::create(id, property, &mut tx).await?;
         //添加sku
         tx.commit().await?;
         Ok(id as u64)
@@ -108,6 +115,7 @@ impl Product {
                     price: row.get::<f64, _>("sku_price"),
                     category_id: row.get::<i64, _>("category_id"),
                     skus: Vec::default(),
+                    property: Vec::default(),
                     r#type: row.get::<PType, _>("type"),
                 })
                 .ok_or(ApiError::Error("NotFound".to_string()))?;
@@ -171,6 +179,7 @@ impl Product {
                 price: row.get::<f64, _>("sku_price"),
                 category_id: row.get::<i64, _>("category_id"),
                 skus: Vec::default(),
+                property: Vec::default(),
                 r#type: row.get::<PType, _>("type"),
             })
             .collect::<Vec<Self>>();

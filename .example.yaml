@@ -43,8 +43,15 @@ installment_fee_rate:
 min_installment_amount: 300
 #预期日息
 installment_fine_rate: 0.05
+#[alipay] 支付配置
 alipay:
   app_id:
   private_key:
   return_url:
   notify_url:
+#[elasticsearch] 配置, host配置后可不用配置其他三项
+elasticsearch:
+  host:
+  cloud_id:
+  username:
+  password:

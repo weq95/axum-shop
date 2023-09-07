@@ -1,5 +1,3 @@
-use std::net::SocketAddr;
-
 use axum::http::StatusCode;
 use axum::response::{IntoResponse, Response};
 
@@ -7,10 +5,13 @@ use axum::response::{IntoResponse, Response};
 async fn main() {
     println!("Hello, world!");
 
-    axum::Server::bind(&SocketAddr::from(([127, 0, 0, 1], 8081)))
-        .serve(router().into_make_service())
-        .await
-        .unwrap();
+    #[cfg(not(target_os = "windows"))]
+    {
+        axum::Server::bind(&SocketAddr::from(([127, 0, 0, 1], 8081)))
+            .serve(router().into_make_service())
+            .await
+            .unwrap();
+    }
 }
 
 fn router() -> axum::Router {

@@ -11,6 +11,7 @@ pub mod installment_items;
 pub mod installments;
 pub mod order_items;
 pub mod orders;
+pub mod product_property;
 pub mod product_skus;
 pub mod products;
 pub mod user;

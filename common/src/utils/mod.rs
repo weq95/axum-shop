@@ -15,6 +15,7 @@ use crate::casbin::PgSqlAdapter;
 use crate::error::ApiResult;
 
 pub mod casbin;
+pub mod elasticsearch;
 pub mod jwt;
 pub mod pwd;
 pub mod rabbitmq;
