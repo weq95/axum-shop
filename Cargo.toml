@@ -3,6 +3,5 @@ members = [
     "admin",
     "web",
     "common",
-    "macros",
     "pay",
 ]

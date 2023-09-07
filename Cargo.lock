@@ -1779,16 +1779,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "macros"
-version = "0.1.0"
-dependencies = [
- "proc-macro2",
- "quote",
- "serde_json",
- "syn 1.0.105",
-]
-
-[[package]]
 name = "matches"
 version = "0.1.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2182,7 +2172,6 @@ version = "0.1.0"
 dependencies = [
  "chrono",
  "hex",
- "macros",
  "openssl",
  "reqwest",
  "serde",
