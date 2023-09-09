@@ -7,6 +7,8 @@ async fn main() {
 
     #[cfg(not(target_os = "windows"))]
     {
+        use std::net::SocketAddr;
+
         axum::Server::bind(&SocketAddr::from(([127, 0, 0, 1], 8081)))
             .serve(router().into_make_service())
             .await
