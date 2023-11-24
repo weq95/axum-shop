@@ -8,6 +8,7 @@ services:
       - ALLOW_EMPTY_PASSWORD=yes
       - REDIS_PORT_NUMBER=6379
       - REDIS_CLUSTER_ANNOUNCE_PORT=6379
+#      - REDIS_CLUSTER_SLOTS=0-4095
       - REDIS_CLUSTER_ANNOUNCE_IP=192.168.1.11 # 主机IP或公网IP，不要使用127.0.0.1或localhost
       - REDIS_CLUSTER_ANNOUNCE_BUS_PORT=16379
       - REDIS_CLUSTER_DYNAMIC_IPS=no
@@ -24,6 +25,7 @@ services:
       - ALLOW_EMPTY_PASSWORD=yes
       - REDIS_PORT_NUMBER=6380
       - REDIS_CLUSTER_ANNOUNCE_PORT=6380
+#      - REDIS_CLUSTER_SLOTS=4096-891
       - REDIS_CLUSTER_ANNOUNCE_BUS_PORT=16380
       - REDIS_CLUSTER_ANNOUNCE_IP=192.168.1.11
       - REDIS_CLUSTER_DYNAMIC_IPS=no
@@ -36,19 +38,25 @@ services:
     image: docker.io/bitnami/redis-cluster:7.0
     volumes:
       - redis-cluster_data-2:/bitnami/redis/data
+    depends_on:
+      - redis-node-0
+      - redis-node-1
     environment:
       - ALLOW_EMPTY_PASSWORD=yes
+      - REDIS_CLUSTER_REPLICAS=1
       - REDIS_PORT_NUMBER=6381
       - REDIS_CLUSTER_ANNOUNCE_PORT=6381
-      - REDIS_CLUSTER_ANNOUNCE_BUS_PORT=16381
+#      - REDIS_CLUSTER_SLOTS=8192-16383
+      - REDIS_CLUSTER_ANNOUNCE_BUS_PORT=16383
       - REDIS_CLUSTER_ANNOUNCE_IP=192.168.1.11
       - REDIS_CLUSTER_DYNAMIC_IPS=no
       - REDIS_NODES=redis-node-0:6379 redis-node-1:6380 redis-node-2:6381
+      - REDIS_CLUSTER_CREATOR=yes
     ports:
       - 6381:6381
       - 16381:16381
 
 volumes:
-  redis-cluster_data-0: #C:\redis-cluster\redis-cluster_data-0
-  redis-cluster_data-1: #C:\redis-cluster\redis-cluster_data-1
-  redis-cluster_data-2: #C:\redis-cluster\redis-cluster_data-2
+  redis-cluster_data-0:
+  redis-cluster_data-1:
+  redis-cluster_data-2:
