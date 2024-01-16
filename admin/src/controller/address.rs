@@ -7,7 +7,7 @@ use axum::{Extension, Json};
 use serde_json::json;
 use validator::Validate;
 
-use common::error::format_errors;
+use common::error::{format_errors, ApiError};
 use common::jwt::Claims;
 use common::request::address::ReqAddressInfo;
 use common::response::address::{ResAddrResult, ResAddress};
@@ -72,7 +72,13 @@ impl AddressController {
             ids.insert(i.district);
             ids.insert(i.street);
         }
-        let address = AddrName(ids).await.unwrap();
+
+        let address = AddrName(ids)
+            .await
+            .map_err(|e| {
+                return e.into_response();
+            })
+            .unwrap();
 
         for i in data {
             result.push(ResAddress {
@@ -98,21 +104,21 @@ impl AddressController {
         Extension(user): Extension<Claims>,
         Json(inner): Json<ReqAddressInfo>,
     ) -> impl IntoResponse {
-        match &inner.validate() {
-            Ok(()) => (),
-            Err(e) => {
-                return ApiResponse::success_code_data(
-                    common::response::FAIL,
-                    Some(json!(format_errors(e.clone()))),
-                )
-                .json();
-            }
-        }
+        inner
+            .validate()
+            .map_err(|e| {
+                return ApiError::ArrayMap(format_errors(e)).into_response();
+            })
+            .unwrap();
 
-        match UserAddress::create(user.id, inner).await {
-            Ok(id) => ApiResponse::response(Some(json!({ "id": id }))).json(),
-            Err(e) => ApiResponse::fail_msg(e.to_string()).json(),
-        }
+        UserAddress::create(user.id, inner)
+            .await
+            .map_err(|e| {
+                return e.into_response();
+            })
+            .map(|id| {
+                return ApiResponse::new(Some(json!({ "id": id })));
+            })
     }
 
     /// 用户更新收获地址
@@ -121,21 +127,21 @@ impl AddressController {
         Extension(user): Extension<Claims>,
         Json(inner): Json<ReqAddressInfo>,
     ) -> impl IntoResponse {
-        match &inner.validate() {
-            Ok(()) => (),
-            Err(e) => {
-                return ApiResponse::success_code_data(
-                    common::response::FAIL,
-                    Some(json!(format_errors(e.clone()))),
-                )
-                .json();
-            }
-        }
+        _ = inner
+            .validate()
+            .map_err(|e| {
+                return ApiError::ArrayMap(format_errors(e)).into_response();
+            })
+            .unwrap();
 
-        match UserAddress::update(id, user.id, inner).await {
-            Ok(bool_val) => ApiResponse::response(Some(json!({ "status": bool_val }))).json(),
-            Err(e) => ApiResponse::fail_msg(e.to_string()).json(),
-        }
+        UserAddress::update(id, user.id, inner)
+            .await
+            .map_err(|e| {
+                return e.into_response();
+            })
+            .map(|bool_val| {
+                return ApiResponse::new(Some(json!({ "status": bool_val })));
+            })
     }
 
     /// 用户删除收获地址
