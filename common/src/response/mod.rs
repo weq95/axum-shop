@@ -1,9 +1,11 @@
 use std::collections::HashMap;
-use std::fmt::Debug;
+use std::fmt::{Debug, Display};
 
+use crate::error::ApiError;
 use axum::response::IntoResponse;
 use axum::{body::Body, response::Response};
 use http::response::Builder;
+use http::StatusCode;
 use serde::{Deserialize, Serialize};
 
 pub mod address;
@@ -17,25 +19,44 @@ pub const FAIL: u16 = 10000;
 #[derive(Debug, Serialize)]
 pub struct ApiResponse<T: Serialize> {
     pub code: u16,
-    pub message: String,
+    pub message: Option<ApiError>,
     pub data: Option<T>,
 }
 
-impl<T: Serialize> ToString for ApiResponse<T> {
-    fn to_string(&self) -> String {
-        serde_json::to_string(self)
+impl<T: Serialize> IntoResponse for ApiResponse<T> {
+    fn into_response(self) -> Response {
+        if let Some(e) = self.message {
+            return e.into_response();
+        }
+
+        let value = serde_json::json!(self).to_string();
+        (StatusCode::OK, value).into_response()
+    }
+}
+
+impl<T: Serialize> Display for ApiResponse<T> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let str = serde_json::to_string(self)
             .map_err(|err| {
                 println!("系统解析错误!!!,err: {}", err);
             })
-            .unwrap_or("".to_string())
+            .unwrap_or("".to_string());
+        write!(f, "{}", str)
     }
 }
 
 impl<T: Serialize> ApiResponse<T> {
+    pub fn new(result: Option<T>) -> Self {
+        Self {
+            code: SUCCESS,
+            message: None,
+            data: result,
+        }
+    }
     pub fn response(result: Option<T>) -> Self {
         Self {
             code: SUCCESS,
-            message: "success".to_string(),
+            message: None,
             data: result,
         }
     }
@@ -43,7 +64,7 @@ impl<T: Serialize> ApiResponse<T> {
     pub fn success() -> Self {
         Self {
             code: SUCCESS,
-            message: "success".to_string(),
+            message: None,
             data: None,
         }
     }
@@ -51,7 +72,7 @@ impl<T: Serialize> ApiResponse<T> {
     pub fn success_code(code: u16) -> Self {
         Self {
             code,
-            message: "success".to_string(),
+            message: None,
             data: None,
         }
     }
@@ -59,7 +80,7 @@ impl<T: Serialize> ApiResponse<T> {
     pub fn success_code_data(code: u16, data: Option<T>) -> Self {
         Self {
             code,
-            message: "success".to_string(),
+            message: None,
             data,
         }
     }
@@ -67,7 +88,7 @@ impl<T: Serialize> ApiResponse<T> {
     pub fn fail_msg(message: String) -> Self {
         Self {
             code: FAIL,
-            message,
+            message: Some(ApiError::Error(message)),
             data: None,
         }
     }
@@ -75,7 +96,7 @@ impl<T: Serialize> ApiResponse<T> {
     pub fn fail_msg_code(code: u16, message: String) -> Self {
         Self {
             code,
-            message,
+            message: Some(ApiError::Error(message)),
             data: None,
         }
     }
