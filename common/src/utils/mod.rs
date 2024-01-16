@@ -60,6 +60,7 @@ lazy_static! {
     pub static ref RABBITMQ: AsyncOnce<Arc<lapin::Connection>> = AsyncOnce::new(async{
         let cfg = &crate::application_config().await.rabbitmq;
         let addr = format!("{}://{}:{}@{}:{}/{}",cfg.scheme,cfg.username,cfg.password,cfg.host,cfg.port,cfg.vhost);
+
         Arc::new(lapin::Connection::connect(addr.as_str(), lapin::ConnectionProperties::default()).await.unwrap())
     });
 }
