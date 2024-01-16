@@ -15,14 +15,41 @@ use serde::{Deserialize, Deserializer, Serialize};
 use validator::{ValidationError, ValidationErrors};
 
 /// 返回资源类型
-pub type ApiResult<T> = std::result::Result<T, ApiError>;
+pub type ApiResult<T> = Result<T, ApiError>;
 
 /// 系统定义错误
 /// kind 错误类型
 /// 详情
 #[derive(Debug, Clone, Serialize)]
 pub enum ApiError {
+    #[serde(rename = "string")]
     Error(String),
+    #[serde(rename = "array")]
+    Array(Vec<String>),
+    #[serde(rename = "map")]
+    Object(HashMap<String, String>),
+    #[serde(rename = "array_map")]
+    ArrayMap(Vec<HashMap<String, String>>),
+}
+
+impl IntoResponse for ApiError {
+    fn into_response(self) -> Response {
+        match self {
+            Self::Error(e) => (StatusCode::BAD_REQUEST, e.to_string()).into_response(),
+            Self::Array(array) => {
+                let value = serde_json::json!(array).to_string();
+                (StatusCode::BAD_REQUEST, value).into_response()
+            }
+            Self::Object(map) => {
+                let value = serde_json::json!(map).to_string();
+                (StatusCode::BAD_REQUEST, value).into_response()
+            }
+            Self::ArrayMap(arr_map) => {
+                let value = serde_json::json!(arr_map).to_string();
+                (StatusCode::BAD_REQUEST, value).into_response()
+            }
+        }
+    }
 }
 
 impl Display for ApiError {
@@ -31,11 +58,14 @@ impl Display for ApiError {
             ApiError::Error(err) => {
                 write!(f, "{}", err)
             }
+            _ => {
+                write!(f, "{}", "other errors")
+            }
         }
     }
 }
 
-impl From<tokio::io::Error> for ApiError {
+impl From<Error> for ApiError {
     fn from(_e: Error) -> Self {
         ApiError::Error(_e.to_string())
     }
@@ -87,17 +117,9 @@ impl From<axum::Error> for ApiError {
     }
 }
 
-impl From<chrono::ParseError> for ApiError {
+impl From<ParseError> for ApiError {
     fn from(_e: ParseError) -> Self {
         ApiError::Error(_e.to_string())
-    }
-}
-
-impl IntoResponse for ApiError {
-    fn into_response(self) -> Response {
-        match self {
-            ApiError::Error(err) => (StatusCode::OK, err.to_string()).into_response(),
-        }
     }
 }
 
