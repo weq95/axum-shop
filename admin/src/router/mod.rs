@@ -14,6 +14,7 @@ pub async fn routers() -> Router {
             .route("/get_config", post(CommController::get_application))
             .route("/upload/files", post(CommController::upload_file))
             .route("/public/:path", get(CommController::show_image))
+            .route("/debug/:param", get(CommController::debug))
             .merge(admin::admin().await)
             .merge(home::home().await),
     )
