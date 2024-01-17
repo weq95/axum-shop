@@ -12,6 +12,7 @@ use chrono::ParseError;
 use redis::RedisError;
 use serde::de::Visitor;
 use serde::{Deserialize, Deserializer, Serialize};
+use serde_json::json;
 use validator::{ValidationError, ValidationErrors};
 
 /// 返回资源类型
@@ -34,21 +35,20 @@ pub enum ApiError {
 
 impl IntoResponse for ApiError {
     fn into_response(self) -> Response {
-        match self {
-            Self::Error(e) => (StatusCode::BAD_REQUEST, e.to_string()).into_response(),
-            Self::Array(array) => {
-                let value = serde_json::json!(array).to_string();
-                (StatusCode::BAD_REQUEST, value).into_response()
-            }
-            Self::Object(map) => {
-                let value = serde_json::json!(map).to_string();
-                (StatusCode::BAD_REQUEST, value).into_response()
-            }
-            Self::ArrayMap(arr_map) => {
-                let value = serde_json::json!(arr_map).to_string();
-                (StatusCode::BAD_REQUEST, value).into_response()
-            }
-        }
+        let message: serde_json::Value = match self {
+            ApiError::Error(e) => json!(e),
+            ApiError::Array(e) => json!(e),
+            ApiError::Object(e) => json!(e),
+            ApiError::ArrayMap(e) => json!(e),
+        };
+
+        let value = json!({
+            "code":  StatusCode::BAD_REQUEST.as_u16(),
+            "message": message,
+            "data": None::<serde_json::Value>,
+        })
+        .to_string();
+        (StatusCode::OK, value).into_response()
     }
 }
 
