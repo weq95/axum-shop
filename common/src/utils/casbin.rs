@@ -9,14 +9,15 @@ use std::{
     task::{Context, Poll},
 };
 
+use axum::response::IntoResponse;
 use axum::{
     async_trait,
     body::{self, Body, BoxBody},
     http::{Request, StatusCode},
-    response::{IntoResponse, Response},
+    response::Response,
 };
+use casbin::error::ModelError;
 use casbin::{
-    error::AdapterError,
     function_map::{key_match2, regex_match},
     Adapter, CachedEnforcer, CoreApi, DefaultModel, Filter, Model, TryIntoAdapter, TryIntoModel,
 };
@@ -109,9 +110,7 @@ where
         let mut ready_inner = std::mem::replace(&mut self.inner, not_ready_inner);
         Box::pin(async move {
             let response_fn = |code: StatusCode, msg: String| -> Response<BoxBody> {
-                ApiResponse::<i32>::fail_msg_code(u16::from(code), msg)
-                    .response_body()
-                    .into_response()
+                ApiResponse::<i32>::fail_msg_code(u16::from(code), msg).into_response()
             };
             let option_vals = req.extensions().get::<CasbinVals>().map(|x| x.to_owned());
             let vals = match option_vals {
@@ -381,7 +380,7 @@ impl Adapter for PgSqlAdapter {
         let rules = sqlx::query("SELECT * FROM casbin_rule")
             .fetch_all(crate::postgres().await)
             .await
-            .map_err(|err| AdapterError(Box::new(err)))?
+            .map_err(|err| ModelError::P(err.to_string()))?
             .into_iter()
             .map(|row| CasbinRule {
                 id: row.get::<i32, &str>("id"),
@@ -427,7 +426,7 @@ impl Adapter for PgSqlAdapter {
             .bind(p_filter[0]).bind(p_filter[1]).bind(p_filter[2])
             .bind(p_filter[3]).bind(p_filter[4]).bind(p_filter[5])
             .fetch_all(crate::postgres().await).await
-            .map_err(|err| AdapterError(Box::new(err)))?
+            .map_err(|err| ModelError::P(err.to_string()))?
             .into_iter().map(|row| {
             CasbinRule {
                 id: row.get::<i32, &str>("id"),
@@ -486,14 +485,14 @@ impl Adapter for PgSqlAdapter {
             .await
             .begin()
             .await
-            .map_err(|err| AdapterError(Box::new(err)))?;
+            .map_err(|err| ModelError::M(err.to_string()))?;
         sqlx::query("DELETE FROM casbin_rule")
             .execute(&mut transaction)
             .await
-            .map_err(|err| AdapterError(Box::new(err)))?;
+            .map_err(|err| ModelError::M(err.to_string()))?;
 
         for rule in rules {
-            sqlx::query(
+            let a = sqlx::query(
                 "INSERT INTO casbin_rule ( ptype, v0, v1, v2, v3, v4, v5 )
                  VALUES ( $1, $2, $3, $4, $5, $6, $7 )",
             )
@@ -505,21 +504,13 @@ impl Adapter for PgSqlAdapter {
             .bind(rule.v4)
             .bind(rule.v5)
             .execute(&mut transaction)
-            .await
-            .and_then(|n| {
-                if PgQueryResult::rows_affected(&n) == 1 {
-                    Ok(true)
-                } else {
-                    Err(SqlError::RowNotFound)
-                }
-            })
-            .map_err(|err| AdapterError(Box::new(err)))?;
+            .await;
         }
 
         transaction
             .commit()
             .await
-            .map_err(|err| AdapterError(Box::new(err)))?;
+            .map_err(|err| ModelError::M(err.to_string()))?;
 
         Ok(())
     }
@@ -529,15 +520,15 @@ impl Adapter for PgSqlAdapter {
             .await
             .begin()
             .await
-            .map_err(|err| AdapterError(Box::new(err)))?;
+            .map_err(|err| ModelError::P(err.to_string()))?;
         sqlx::query("DELETE FROM casbin_rule")
             .execute(&mut transaction)
             .await
-            .map_err(|err| AdapterError(Box::new(err)))?;
+            .map_err(|err| ModelError::P(err.to_string()))?;
         transaction
             .commit()
             .await
-            .map_err(|err| AdapterError(Box::new(err)))?;
+            .map_err(|err| ModelError::P(err.to_string()))?;
 
         Ok(())
     }
@@ -570,7 +561,7 @@ impl Adapter for PgSqlAdapter {
             .await
             .begin()
             .await
-            .map_err(|err| AdapterError(Box::new(err)))?;
+            .map_err(|err| ModelError::P(err.to_string()))?;
 
         for rule in new_rules {
             sqlx::query(
@@ -593,13 +584,13 @@ impl Adapter for PgSqlAdapter {
                     Err(SqlError::RowNotFound)
                 }
             })
-            .map_err(|err| AdapterError(Box::new(err)))?;
+            .map_err(|err| ModelError::P(err.to_string()))?;
         }
 
         transaction
             .commit()
             .await
-            .map_err(|err| AdapterError(Box::new(err)))?;
+            .map_err(|err| ModelError::P(err.to_string()))?;
         Ok(true)
     }
 
@@ -622,7 +613,7 @@ impl Adapter for PgSqlAdapter {
             .await
             .begin()
             .await
-            .map_err(|err| AdapterError(Box::new(err)))?;
+            .map_err(|err| ModelError::P(err.to_string()))?;
 
         for rule in rules {
             let rule = normalize_casbin_rule(rule);
@@ -646,13 +637,13 @@ impl Adapter for PgSqlAdapter {
                     Err(SqlError::RowNotFound)
                 }
             })
-            .map_err(|err| AdapterError(Box::new(err)))?;
+            .map_err(|err| ModelError::P(err.to_string()))?;
         }
 
         transaction
             .commit()
             .await
-            .map_err(|err| AdapterError(Box::new(err)))?;
+            .map_err(|err| ModelError::P(err.to_string()))?;
 
         Ok(true)
     }
@@ -703,7 +694,7 @@ impl Adapter for PgSqlAdapter {
             .execute(crate::postgres().await)
             .await
             .map(|n| PgQueryResult::rows_affected(&n) >= 1)
-            .map_err(|err| AdapterError(Box::new(err)))?;
+            .map_err(|err| ModelError::P(err.to_string()))?;
 
         Ok(true)
     }
