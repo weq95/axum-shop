@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::ops::DerefMut;
 use std::sync::Arc;
 
@@ -62,6 +63,27 @@ impl CommController {
         todo!()
     }*/
 
+    pub async fn debug(Path(path): Path<String>) -> impl IntoResponse {
+        match path.as_str() {
+            "array" => ApiError::Array(vec!["错误1".to_string(), "错误2".to_string()]),
+            "object" => ApiError::Object(HashMap::from([
+                ("f1".to_string(), "错误2描述".to_string()),
+                ("f2".to_string(), "错误2描述".to_string()),
+            ])),
+            "array_object" => ApiError::ArrayMap(vec![
+                HashMap::from([
+                    ("f1".to_string(), "错误2描述".to_string()),
+                    ("f2".to_string(), "错误2描述".to_string()),
+                ]),
+                HashMap::from([
+                    ("f3".to_string(), "错误3描述".to_string()),
+                    ("f4".to_string(), "错误4描述".to_string()),
+                ]),
+            ]),
+            "string" | _ => ApiError::Error("00 error string example".to_string()),
+        }.into_response()
+    }
+
     /// 测试 redis.json 数据接口
     pub async fn test_redis(Json(payload): Json<serde_json::Value>) -> impl IntoResponse {
         let key = payload.get("key").unwrap().as_str().unwrap();
@@ -81,7 +103,7 @@ impl CommController {
                     "access_token": access_token,
                     "refresh_token":refresh_token,
                 })))
-                .json(),
+                    .json(),
                 Err(_) => ApiResponse::fail_msg("refresh_token 刷新失败[02]".to_string()).json(),
             },
             None => ApiResponse::fail_msg("refresh_token 刷新失败[01]".to_string()).json(),
@@ -103,7 +125,7 @@ impl CommController {
                     return ApiResponse::response(Some(
                         json!({ "path": path, "preview_url":preview_url }),
                     ))
-                    .json();
+                        .json();
                 }
 
                 ApiResponse::fail_msg("文件上传失败".to_string()).json()
@@ -183,7 +205,7 @@ impl CommController {
             "queue": true,
             "dlx-queue": true,
         })))
-        .json()
+            .json()
     }
 }
 
