@@ -26,11 +26,21 @@ pub struct ApiResponse<T: Serialize> {
 
 impl<T: Serialize> IntoResponse for ApiResponse<T> {
     fn into_response(self) -> Response {
+        let mut err_type = String::from("string");
         let message: serde_json::Value = match self.message {
             Some(ApiError::Error(e)) => json!(e),
-            Some(ApiError::Array(e)) => json!(e),
-            Some(ApiError::Object(e)) => json!(e),
-            Some(ApiError::ArrayMap(e)) => json!(e),
+            Some(ApiError::Array(e)) => {
+                err_type = String::from("array");
+                json!(e)
+            },
+            Some(ApiError::Object(e)) => {
+                err_type = String::from("map");
+                json!(e)
+            },
+            Some(ApiError::ArrayMap(e)) => {
+                err_type = String::from("array_map");
+                json!(e)
+            },
             None => json!(String::from("success")),
         };
 
@@ -39,6 +49,7 @@ impl<T: Serialize> IntoResponse for ApiResponse<T> {
             json!({
                 "code": self.code,
                 "message": message,
+                "err_type": err_type,
                 "data": self.data,
             })
             .to_string(),
