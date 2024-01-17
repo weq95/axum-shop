@@ -5,8 +5,9 @@ use crate::error::ApiError;
 use axum::response::IntoResponse;
 use axum::{body::Body, response::Response};
 use http::response::Builder;
-use http::StatusCode;
+use http::{HeaderName, HeaderValue, StatusCode};
 use serde::{Deserialize, Serialize};
+use serde_json::json;
 
 pub mod address;
 pub mod user;
@@ -25,12 +26,30 @@ pub struct ApiResponse<T: Serialize> {
 
 impl<T: Serialize> IntoResponse for ApiResponse<T> {
     fn into_response(self) -> Response {
-        if let Some(e) = self.message {
-            return e.into_response();
-        }
+        let message: serde_json::Value = match self.message {
+            Some(ApiError::Error(e)) => json!(e),
+            Some(ApiError::Array(e)) => json!(e),
+            Some(ApiError::Object(e)) => json!(e),
+            Some(ApiError::ArrayMap(e)) => json!(e),
+            None => json!(String::from("success")),
+        };
 
-        let value = serde_json::json!(self).to_string();
-        (StatusCode::OK, value).into_response()
+        let mut response = (
+            StatusCode::OK,
+            json!({
+                "code": self.code,
+                "message": message,
+                "data": self.data,
+            })
+            .to_string(),
+        )
+            .into_response();
+        response.headers_mut().insert(
+            "Content-Type".parse::<HeaderName>().unwrap(),
+            "text/json; charset=UTF-8".parse::<HeaderValue>().unwrap(),
+        );
+
+        response
     }
 }
 
@@ -119,8 +138,23 @@ impl<T: Serialize> ApiResponse<T> {
     }
 
     pub fn response_body(&self) -> Response<Body> {
+        let message: serde_json::Value = match &self.message {
+            Some(ApiError::Error(e)) => json!(e),
+            Some(ApiError::Array(e)) => json!(e),
+            Some(ApiError::Object(e)) => json!(e),
+            Some(ApiError::ArrayMap(e)) => json!(e),
+            None => json!(String::from("success")),
+        };
+
         Self::set_content_type(None)
-            .body(Body::from(self.to_string()))
+            .body(Body::from(
+                json!({
+                    "code": self.code,
+                    "message": message,
+                    "data": self.data,
+                })
+                .to_string(),
+            ))
             .unwrap()
     }
 }
