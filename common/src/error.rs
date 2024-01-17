@@ -35,19 +35,33 @@ pub enum ApiError {
 
 impl IntoResponse for ApiError {
     fn into_response(self) -> Response {
+        let mut err_type = String::from("string");
         let message: serde_json::Value = match self {
-            ApiError::Error(e) => json!(e),
-            ApiError::Array(e) => json!(e),
-            ApiError::Object(e) => json!(e),
-            ApiError::ArrayMap(e) => json!(e),
+            ApiError::Error(e) => {
+                err_type = String::from("string");
+                json!(e)
+            }
+            ApiError::Array(e) => {
+                err_type = String::from("array");
+                json!(e)
+            }
+            ApiError::Object(e) => {
+                err_type = String::from("map");
+                json!(e)
+            }
+            ApiError::ArrayMap(e) => {
+                err_type = String::from("array_map");
+                json!(e)
+            }
         };
 
         let value = json!({
             "code":  StatusCode::BAD_REQUEST.as_u16(),
             "message": message,
+            "err_type": err_type,
             "data": None::<serde_json::Value>,
         })
-        .to_string();
+            .to_string();
         (StatusCode::OK, value).into_response()
     }
 }
@@ -206,15 +220,15 @@ impl<'de> Visitor<'de> for ApiVisitor {
     }
 
     fn visit_str<E>(self, v: &str) -> Result<Self::Value, E>
-    where
-        E: serde::de::Error,
+        where
+            E: serde::de::Error,
     {
         Ok(v.to_string())
     }
 
     fn visit_string<E>(self, v: String) -> Result<Self::Value, E>
-    where
-        E: serde::de::Error,
+        where
+            E: serde::de::Error,
     {
         Ok(v)
     }
@@ -222,8 +236,8 @@ impl<'de> Visitor<'de> for ApiVisitor {
 
 impl<'de> Deserialize<'de> for ApiError {
     fn deserialize<D>(de: D) -> Result<Self, D::Error>
-    where
-        D: Deserializer<'de>,
+        where
+            D: Deserializer<'de>,
     {
         Ok(ApiError::Error(de.deserialize_string(ApiVisitor)?))
     }
